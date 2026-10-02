@@ -1,0 +1,72 @@
+/* ============================================================
+   RESTART: dejar la mesa limpia antes de empezar
+   ------------------------------------------------------------
+   Cada navegador trae sus propios estilos por defecto
+   (márgenes, tamaños, etc.) y eso hace que la página se vea
+   distinto en cada lugar. Este archivo los borra a todos
+   para empezar desde cero, igual para todos.
+   ============================================================ */
+
+/* A todos los elementos: usar la misma forma de medir cajas
+   y sacar márgenes y rellenos que vienen de fábrica. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box; /* el ancho incluye borde y relleno, más fácil de calcular */
+  margin: 0;
+  padding: 0;
+}
+
+/* Cuando saltás a una sección (#contacto), que baje suave, no de golpe. */
+html {
+  scroll-behavior: smooth;
+}
+
+/* El cuerpo ocupa toda la pantalla y el texto respira con interlineado 1.5. */
+body {
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* Las imágenes y videos nunca se desbordan y se ven como bloques. */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Los campos y botones heredan la letra de la página (no la fea por defecto). */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Botones sin borde ni fondo: los vestimos nosotros después. */
+button {
+  border: none;
+  background: none;
+  cursor: pointer; /* manito al pasar el mouse */
+}
+
+/* Los enlaces heredan el color y sin subrayado (lo agregamos si queremos). */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Listas sin puntitos ni números (los dibujamos con nuestro diseño). */
+ul,
+ol {
+  list-style: none;
+}
+
+/* Tablas sin espacios dobles entre celdas. */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es-uy">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Squada+One&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <title>Agendar turno | Street Barbershop</title>
+  </head>
+  <body class="agenda-page">
+    <header class="site-header" id="inicio">
+      <nav class="site-nav" aria-label="Navegación principal">
+        <ul>
+          <li><a href="index.html#nosotros">NOSOTROS</a></li>
+          <li><a href="agenda.html" aria-current="page">AGENDAR</a></li>
+          <li><a href="#redes">REDES</a></li>
+          <li><a href="index.html#servicios">SERVICIOS</a></li>
+        </ul>
+      </nav>
+
+      <a class="brand" href="index.html" aria-label="Street Barbershop, inicio">
+        Street<br />
+        Barbershop
+      </a>
+    </header>
+
+    <main class="agenda">
+      <div class="agenda-header">
+        <h1 id="agenda-title">Elegí día<br />y <span>horario.</span></h1>
+        <p>Mostramos los próximos cinco días abiertos. Los horarios pasados se ocultan.</p>
+      </div>
+
+      <section
+        class="active-booking"
+        id="active-booking"
+        aria-labelledby="active-booking-title"
+        hidden
+      >
+        <div class="active-booking__copy">
+          <p class="active-booking__eyebrow">TU RESERVA</p>
+          <h2 id="active-booking-title">Ya tenés un turno solicitado</h2>
+          <p class="active-booking__hint">
+            Para evitar reservas duplicadas, solo podés mantener un turno activo.
+          </p>
+        </div>
+
+        <time class="active-booking__date" id="active-booking-date">
+          <span id="active-booking-day"></span>
+          <strong id="active-booking-time"></strong>
+        </time>
+
+        <div class="active-booking__actions">
+          <button type="button" class="active-booking__change" data-change-turno>
+            CAMBIAR TURNO
+          </button>
+          <button type="button" class="active-booking__cancel" data-cancel-turno>
+            CANCELAR TURNO
+          </button>
+        </div>
+      </section>
+
+      <div class="agenda-panel">
+        <p class="agenda-status" id="agenda-status" role="status" aria-live="polite" hidden></p>
+        <div
+          id="calendario"
+          role="region"
+          aria-label="Horarios disponibles para los próximos cinco días abiertos"
+        ></div>
+      </div>
+    </main>
+
+    <dialog
+      class="booking-modal"
+      id="booking-modal"
+      aria-labelledby="booking-modal-title"
+    >
+      <div class="booking-modal__card">
+        <button
+          class="booking-modal__close"
+          type="button"
+          aria-label="Cerrar formulario"
+          data-close-modal
+        >
+          ×
+        </button>
+
+        <div class="booking-modal__heading">
+          <div>
+            <p data-modal-eyebrow>COMPLETÁ TUS DATOS</p>
+            <h2 id="booking-modal-title">Reservá tu turno</h2>
+          </div>
+
+          <p class="booking-modal__selection" aria-live="polite">
+            <span id="turno-fecha"></span>
+            <strong id="turno-hora"></strong>
+          </p>
+        </div>
+
+        <form class="booking-form" id="booking-form" action="#" method="post">
+          <input type="hidden" id="turno-fecha-value" name="fecha" />
+          <input type="hidden" id="turno-hora-value" name="hora" />
+
+          <div class="booking-form__field booking-form__field--wide">
+            <label for="turno-nombre">NOMBRE COMPLETO</label>
+            <input
+              type="text"
+              id="turno-nombre"
+              name="nombre"
+              autocomplete="name"
+              minlength="2"
+              maxlength="60"
+              data-nombre-persona
+              placeholder="Tu nombre"
+              required
+            />
+          </div>
+
+          <div class="booking-form__field booking-form__field--wide">
+            <label for="turno-telefono">TELÉFONO</label>
+            <input
+              type="tel"
+              id="turno-telefono"
+              name="telefono"
+              autocomplete="tel"
+              inputmode="numeric"
+              pattern="09[0-9]{7}"
+              minlength="9"
+              maxlength="9"
+              title="Ingresá un celular uruguayo de 9 dígitos que comience con 09"
+              data-telefono-uy
+              placeholder="091234567"
+              aria-describedby="turno-telefono-ayuda"
+              required
+            />
+            <small class="booking-form__help" id="turno-telefono-ayuda">
+              9 dígitos, comenzando con 09.
+            </small>
+          </div>
+
+          <p
+            class="booking-form__feedback"
+            id="booking-form-feedback"
+            role="alert"
+            aria-live="assertive"
+            hidden
+          ></p>
+
+          <button class="booking-form__submit" type="submit" data-submit-turno>
+            <span class="booking-form__submit-label" data-submit-label>
+              QUIERO MI TURNO
+            </span>
+            <span class="booking-form__submit-arrow" aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <div class="booking-success" id="booking-success" hidden>
+          <span aria-hidden="true">✓</span>
+          <h2 tabindex="-1" data-success-title>¡Turno solicitado!</h2>
+          <p id="booking-success-message">
+            Recibimos tus datos. Nos pondremos en contacto para confirmar la reserva.
+          </p>
+          <button type="button" data-close-modal>CERRAR</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog
+      class="cancel-modal"
+      id="cancel-modal"
+      aria-labelledby="cancel-modal-title"
+      aria-describedby="cancel-modal-description"
+    >
+      <div class="cancel-modal__card">
+        <button
+          type="button"
+          class="cancel-modal__close"
+          aria-label="Cerrar confirmación"
+          data-close-cancel
+        >
+          ×
+        </button>
+        <p class="cancel-modal__eyebrow">CONFIRMÁ LA CANCELACIÓN</p>
+        <h2 id="cancel-modal-title">¿Cancelamos tu turno?</h2>
+        <p id="cancel-modal-description">
+          El horario volverá a quedar disponible para otra persona.
+        </p>
+        <p class="cancel-modal__turn" id="cancel-modal-turn"></p>
+        <div class="cancel-modal__actions">
+          <button type="button" data-close-cancel>MANTENER TURNO</button>
+          <button type="button" class="cancel-modal__confirm" data-confirm-cancel>
+            SÍ, CANCELAR
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <footer class="site-footer" id="redes">
+      <div class="site-footer__main">
+        <div class="site-footer__brand">
+          <h2>STREET<br />BARBERSHOP</h2>
+
+          <p>
+            Cortes, estilo y atención personalizada. Tu próxima versión empieza acá.
+          </p>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>NAVEGACIÓN</h3>
+
+          <nav aria-label="Navegación del pie de página">
+            <ul>
+              <li><a href="index.html#nosotros">NOSOTROS</a></li>
+              <li><a href="agenda.html" aria-current="page">AGENDAR</a></li>
+              <li><a href="index.html#servicios">SERVICIOS</a></li>
+              <li><a href="index.html#cortes">CORTES</a></li>
+              <li><a href="index.html#contacto">CONTACTO</a></li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>CONTACTO</h3>
+
+          <address>
+            <p>
+              <a href="tel:+000000000">+00 0000 0000</a>
+            </p>
+
+            <p>
+              <a href="mailto:contacto@streetbarbershop.com">
+                contacto@streetbarbershop.com
+              </a>
+            </p>
+
+            <p>Tu ciudad, tu dirección</p>
+          </address>
+        </div>
+
+        <div class="site-footer__column site-footer__social">
+          <h3>SEGUINOS</h3>
+
+          <ul>
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                INSTAGRAM <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                FACEBOOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                TIKTOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="site-footer__bottom">
+        <p>© 2026 Street Barbershop. Todos los derechos reservados.</p>
+
+        <a href="#inicio">VOLVER ARRIBA <span aria-hidden="true">↑</span></a>
+      </div>
+    </footer>
+
+    <script src="js/validacion.js"></script>
+    <script src="js/calendario-fechas.js"></script>
+    <script src="js/reservas-temporales.js"></script>
+    <script src="js/calendario.js"></script>
+  </body>
+</html>

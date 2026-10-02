@@ -1,0 +1,18 @@
+/* ============================================================
+   STYLE: la puerta de entrada de todos los estilos
+   ------------------------------------------------------------
+   Imaginá que el CSS es la ropa de la página.
+   Este archivo no tiene ropa en sí: solo dice qué placares abrir,
+   en qué orden. El navegador los lee de arriba hacia abajo.
+   1) basics/ = lo general (reset, colores, header y footer).
+   2) pages/  = lo de cada página (home y agenda).
+   ============================================================ */
+
+/* Lo básico primero: dejar todo en cero, definir colores y el menú/pie. */
+@import "./basics/restart.css";
+@import "./basics/colores&tipografia.css";
+@import "./basics/header&footer.css";
+
+/* Después lo específico de cada página. */
+@import "./pages/home.css";
+@import "./pages/agenda.css";

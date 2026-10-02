@@ -1,0 +1,77 @@
+/* ============================================================
+   COLORES Y TIPOGRAFÍA: la paleta y las letras de la marca
+   ------------------------------------------------------------
+   Aquí guardamos los colores y fuentes en variables (--algo).
+   Una variable es como un frasquito con un valor adentro:
+   la definís una vez y la usás en cien lugares. Si un día
+   querés cambiar el naranja, lo cambiás aquí y cambia todo.
+   ============================================================ */
+
+/* -- Los frasquitos de colores y medidas -- */
+/* Grises del más claro al más oscuro + naranjas de la marca. */
+:root {
+  --gris1: #f7f7f7;
+  --gris2: #a6a6a6;
+  --gris3: #878787;
+  --gris4: #7b7b7b;
+  --gris5: #555555;
+  --gris6: #373737;
+  --gris7: #252525;
+  --gris8: #0e0e0e;
+
+  --naranja1: #f3b780;
+  --naranja2: #f69d4c;
+  --naranja3: #f6943b;
+  --naranja4: #f2801b;
+  --naranja5: #fb7904;
+
+  /* Ancho máximo de la página y aire en los costados. */
+  --page-max: 1180px;
+  --page-pad: clamp(1.25rem, 4vw, 4rem); /* se adapta solo a la pantalla */
+  /* Fuentes: Squada para títulos grandes, Roboto para texto normal. */
+  --display-font: "Squada One", Impact, sans-serif;
+  --body-font: "Roboto", Arial, sans-serif;
+  /* Atajos: --accent es el naranja principal, --ink el negro, --paper el blanco. */
+  --accent: var(--naranja5);
+  --ink: var(--gris8);
+  --paper: var(--gris1);
+}
+
+/* -- Cómo se ve todo el cuerpo por defecto -- */
+/* Fondo negro, texto clarito, letra Roboto. */
+body {
+  overflow-x: hidden; /* nada se sale por los costados */
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--body-font);
+  -webkit-font-smoothing: antialiased; /* letras más suaves en Mac/iPhone */
+}
+
+/* Cuando seleccionás texto con el mouse, se pinta de naranja. */
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Cuando navegás con teclado (Tab), se ve un borde naranja grueso. Ayuda a no perderse. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* En celulares chiquitos, achicamos el aire de los costados. */
+@media (max-width: 420px) {
+  :root {
+    --page-pad: 1rem;
+  }
+}
+
+/* Si la persona pidió "menos animaciones" en su sistema, las apagamos casi todas. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

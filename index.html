@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es-uy">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Squada+One&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <title>Street Barber</title>
+  </head>
+  <body>
+    <header class="site-header" id="inicio">
+      <nav class="site-nav" aria-label="Navegación principal">
+        <ul>
+          <li><a href="#nosotros">NOSOTROS</a></li>
+          <li><a href="agenda.html">AGENDAR</a></li>
+          <li><a href="#redes">REDES</a></li>
+          <li><a href="#servicios">SERVICIOS</a></li>
+        </ul>
+      </nav>
+
+      <a class="brand" href="#inicio" aria-label="Street Barbershop, inicio">
+        Street<br />
+        Barbershop
+      </a>
+    </header>
+
+    <main>
+      <section class="hero" id="agendar">
+        <img
+          src="imgs/sources/hero-background.jpg"
+          alt=""
+          class="hero__background"
+          aria-hidden="true"
+        />
+
+        <div class="hero__content">
+          <p class="hero__eyebrow">Estilo que habla por vos</p>
+          <h1 class="hero__title">
+            Tu mejor <strong>versión</strong><br />
+            empieza con un buen <strong>corte.</strong>
+          </h1>
+        </div>
+
+        <div class="booking-card" data-booking-card>
+          <p class="booking-card__eyebrow" data-booking-eyebrow>RESERVÁ TU CITA</p>
+
+          <h2 data-booking-title>¡AGENDATE YA!</h2>
+
+          <p
+            class="booking-card__label"
+            data-booking-label
+            data-reserved-text="Gracias por haber reservado turno con nosotros."
+          >
+            PRÓXIMO TURNO DISPONIBLE
+          </p>
+
+          <time class="booking-card__date" data-booking-date aria-live="polite">
+            <span data-booking-day>—</span>
+            <strong data-booking-time>—</strong>
+          </time>
+
+          <a class="booking-card__button" href="agenda.html">
+            <span class="booking-card__button-label" data-booking-cta>
+              RESERVAR AHORA
+            </span>
+            <span class="booking-card__button-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="highlights" id="nosotros">
+        <div class="highlights__image-wrap">
+          <img
+            src="imgs/sources/destacados-img.jpg"
+            alt="Barbero realizando un corte de cabello"
+            class="highlights__image"
+          />
+        </div>
+
+        <div class="highlights__list">
+          <article class="highlight">
+            <span class="highlight__number">01</span>
+            <h2>MÁS QUE UN CORTE</h2>
+            <p>Ofrecemos un servicio pensado especialmente para vos.</p>
+          </article>
+
+          <article class="highlight">
+            <span class="highlight__number">02</span>
+            <h2>ASESORÍA ÚNICA</h2>
+            <p>Encontramos el estilo que mejor acompaña tu identidad.</p>
+          </article>
+
+          <article class="highlight">
+            <span class="highlight__number">03</span>
+            <h2>ATENCIÓN</h2>
+            <p>Tu comodidad y tu experiencia son nuestra prioridad.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="cuts" id="servicios">
+        <div class="cuts__heading">
+          <div>
+            <p class="section-eyebrow">TRABAJO CON IDENTIDAD</p>
+            <h2 id="cortes">NUESTROS <span>CORTES</span></h2>
+          </div>
+
+          <p class="cuts__intro">
+            Técnica, detalle y una propuesta pensada para potenciar tu estilo.
+          </p>
+        </div>
+
+        <div class="cuts__grid">
+          <figure class="cut-card cut-card--featured">
+            <img
+              src="imgs/sources/destacados-img.jpg"
+              alt="Detalle de un corte y perfilado de barba"
+            />
+            <figcaption>
+              <span>01</span>
+              <div>
+                <h3>CORTE &amp; BARBA</h3>
+                <p>El servicio completo</p>
+              </div>
+            </figcaption>
+          </figure>
+
+          <figure class="cut-card">
+            <img
+              src="imgs/sources/destacados-img.jpg"
+              alt="Barbero trabajando un acabado de precisión"
+            />
+            <figcaption>
+              <span>02</span>
+              <div>
+                <h3>DEGRADÉ</h3>
+                <p>Líneas limpias y precisas</p>
+              </div>
+            </figcaption>
+          </figure>
+
+          <figure class="cut-card cut-card--tools">
+            <img
+              src="imgs/sources/hero-background.jpg"
+              alt="Herramientas profesionales de barbería"
+            />
+            <figcaption>
+              <span>03</span>
+              <div>
+                <h3>PERFILADO</h3>
+                <p>Terminaciones impecables</p>
+              </div>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="appointment" id="contacto">
+        <img
+          src="imgs/sources/hero-background.jpg"
+          alt=""
+          class="appointment__background"
+          aria-hidden="true"
+        />
+
+        <div class="appointment__inner">
+          <div class="appointment__copy">
+            <p class="section-eyebrow">TU PRÓXIMO CORTE</p>
+            <h2><span>QUIERO SER</span><br />CLIENTE!</h2>
+            <p>Dejanos tus datos y coordinamos un horario que te quede cómodo.</p>
+          </div>
+
+          <form class="appointment-form" action="agenda.html" method="get">
+            <div class="form-field form-field--wide">
+              <label for="nombre">NOMBRE COMPLETO</label>
+              <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                autocomplete="name"
+                minlength="2"
+                maxlength="60"
+                data-nombre-persona
+                required
+                placeholder="Tu nombre"
+              />
+            </div>
+
+            <div class="form-field form-field--wide">
+              <label for="telefono">TELÉFONO</label>
+              <input
+                type="tel"
+                id="telefono"
+                name="telefono"
+                autocomplete="tel"
+                inputmode="numeric"
+                pattern="09[0-9]{7}"
+                minlength="9"
+                maxlength="9"
+                title="Ingresá un celular uruguayo de 9 dígitos que comience con 09"
+                data-telefono-uy
+                required
+                placeholder="091234567"
+              />
+            </div>
+
+            <button type="submit">
+              ELEGIR DÍA Y HORARIO <span aria-hidden="true">→</span>
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" id="redes">
+      <div class="site-footer__main">
+        <div class="site-footer__brand">
+          <h2>STREET<br />BARBERSHOP</h2>
+
+          <p>
+            Cortes, estilo y atención personalizada. Tu próxima versión empieza acá.
+          </p>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>NAVEGACIÓN</h3>
+
+          <nav aria-label="Navegación del pie de página">
+            <ul>
+              <li><a href="#nosotros">NOSOTROS</a></li>
+              <li><a href="agenda.html">AGENDAR</a></li>
+              <li><a href="#servicios">SERVICIOS</a></li>
+              <li><a href="#cortes">CORTES</a></li>
+              <li><a href="#contacto">CONTACTO</a></li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>CONTACTO</h3>
+
+          <address>
+            <p>
+              <a href="tel:+000000000">+00 0000 0000</a>
+            </p>
+
+            <p>
+              <a href="mailto:contacto@streetbarbershop.com">
+                contacto@streetbarbershop.com
+              </a>
+            </p>
+
+            <p>Tu ciudad, tu dirección</p>
+          </address>
+        </div>
+
+        <div class="site-footer__column site-footer__social">
+          <h3>SEGUINOS</h3>
+
+          <ul>
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                INSTAGRAM <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                FACEBOOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                TIKTOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="site-footer__bottom">
+        <p>© 2026 Street Barbershop. Todos los derechos reservados.</p>
+
+        <a href="#inicio">VOLVER ARRIBA <span aria-hidden="true">↑</span></a>
+      </div>
+    </footer>
+
+    <script src="js/validacion.js"></script>
+    <script src="js/calendario-fechas.js"></script>
+    <script src="js/reservas-temporales.js"></script>
+    <script src="js/home.js"></script>
+  </body>
+</html>

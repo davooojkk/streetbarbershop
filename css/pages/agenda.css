@@ -1,0 +1,897 @@
+/* ============================================================
+   AGENDA: los estilos de agenda.html (elegir día y horario)
+   ------------------------------------------------------------
+   Guía rápida si nunca viste CSS:
+   - ".agenda" = la página entera con foto de fondo oscura.
+   - ".active-booking" = el cartel verde "Tu reserva" de arriba.
+   - ".agenda-panel" = la caja clarita con los 5 días.
+   - ".dia" = cada columna de día. ".horario" = cada botón de hora.
+     Verde = tu turno. Gris = ocupado. Tachado = ya pasó.
+   - ".booking-modal" = ventanita para escribir nombre/teléfono.
+   - ".cancel-modal" = ventanita roja "¿seguro que cancelás?".
+   ============================================================ */
+
+/* Color marrón-naranja especial para textos sobre fondo claro (se lee mejor). */
+.agenda-page {
+  --agenda-accent-text: #9b3f00;
+  background: #0b0b0b;
+}
+
+/* Cuando hay una ventanita abierta, la página de atrás no se mueve. */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* La página entera: fondo negro con foto arriba que se funde hacia abajo. */
+.agenda {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100vh;
+  padding: clamp(4.5rem, 9vw, 8rem) max(var(--page-pad), calc((100vw - var(--page-max)) / 2));
+  background: #0b0b0b;
+}
+
+.agenda::before {
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 auto;
+  height: 42rem;
+  background-image: url("../../imgs/sources/hero-background.jpg");
+  background-position: center 46%;
+  background-size: cover;
+  content: "";
+  opacity: 0.35;
+}
+
+.agenda::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(11, 11, 11, 0.44) 0, #0b0b0b 40rem),
+    linear-gradient(90deg, rgba(11, 11, 11, 0.86), rgba(11, 11, 11, 0.5));
+  content: "";
+}
+
+/* El título gigante "Elegí día y horario" + texto explicativo. */
+.agenda-header {
+  max-width: 52rem;
+  margin-bottom: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.agenda-header > p {
+  max-width: 35rem;
+  margin-top: 1.5rem;
+  color: #d0ccc7;
+  font-size: clamp(0.78rem, 1.4vw, 0.92rem);
+  line-height: 1.6;
+}
+
+.agenda-header h1 {
+  color: #fff;
+  font-family: var(--display-font);
+  font-size: clamp(4.5rem, 10vw, 8.5rem);
+  font-weight: 400;
+  line-height: 0.77;
+  letter-spacing: -0.035em;
+}
+
+.agenda-header h1 span {
+  color: var(--accent);
+}
+
+/* -- El cartel "Ya tenés un turno": texto + fecha + 2 botones -- */
+/* Borde verde a la izquierda. Si estás cambiando, se vuelve naranja. */
+.active-booking {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.35fr) minmax(11rem, 0.65fr) auto;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+  padding: clamp(1.25rem, 2.8vw, 2rem);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 5px solid #4fa36a;
+  background: rgba(20, 20, 20, 0.94);
+  box-shadow: 14px 14px 0 rgba(45, 122, 70, 0.15);
+}
+
+.active-booking[hidden] {
+  display: none;
+}
+
+.active-booking--changing {
+  border-left-color: var(--accent);
+  box-shadow: 14px 14px 0 rgba(251, 121, 4, 0.16);
+}
+
+.active-booking__eyebrow {
+  margin-bottom: 0.35rem;
+  color: #71c68a;
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.active-booking--changing .active-booking__eyebrow {
+  color: var(--accent);
+}
+
+.active-booking h2 {
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 3.5vw, 2.7rem);
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.active-booking__hint {
+  max-width: 31rem;
+  margin-top: 0.55rem;
+  color: var(--gris2);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.active-booking__date {
+  padding-left: 1.2rem;
+  border-left: 3px solid #4fa36a;
+}
+
+.active-booking__date span,
+.active-booking__date strong {
+  display: block;
+}
+
+.active-booking__date span {
+  color: var(--gris2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.active-booking__date strong {
+  margin-top: 0.15rem;
+  color: #71c68a;
+  font-family: var(--display-font);
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.active-booking__actions {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 10.5rem;
+}
+
+.active-booking__actions button {
+  min-height: 2.8rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #545454;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.active-booking__change {
+  background: #fff;
+  color: var(--ink) !important;
+}
+
+.active-booking__cancel:hover,
+.active-booking__cancel:focus-visible {
+  border-color: #ff8c82;
+  color: #ffaaa3;
+}
+
+.active-booking__change:hover,
+.active-booking__change:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff !important;
+}
+
+/* -- La caja clarita que contiene los 5 días -- */
+/* Borde naranja arriba + sombra dura, igual que en la home. */
+.agenda-panel {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  padding: clamp(1rem, 2.5vw, 2rem);
+  border-top: 5px solid var(--accent);
+  background: #f4f1ed;
+  box-shadow: 18px 18px 0 rgba(251, 121, 4, 0.16);
+  color: var(--ink);
+}
+
+/* Cartel de mensajes: verde éxito, rojo error (ver [data-tipo]). */
+.agenda-status {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border-left: 4px solid var(--accent);
+  background: #fff;
+  color: var(--gris6);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.agenda-status[data-tipo="exito"] {
+  border-left-color: #2d7a46;
+}
+
+.agenda-status[data-tipo="error"] {
+  border-left-color: #b42318;
+}
+
+.agenda-panel :focus-visible,
+.booking-modal :focus-visible {
+  outline-color: var(--agenda-accent-text);
+}
+
+/* Las 5 columnas de días: en PC se ven todas, en tablet 3, en celular 1. */
+#calendario {
+  display: grid;
+  max-width: 100%;
+  grid-template-columns: repeat(5, minmax(9rem, 1fr));
+  gap: clamp(0.65rem, 1.4vw, 1rem);
+  overflow-x: auto;
+  padding: 0.15rem 0.15rem 0.8rem;
+  scrollbar-color: var(--accent) #ded9d3;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  overscroll-behavior-inline: contain;
+}
+
+/* Cada día: tarjetita blanca con nombre + fecha + botones de horas. */
+.dia {
+  min-width: 0;
+  padding: clamp(0.8rem, 1.8vw, 1.2rem);
+  border: 1px solid #d8d2cb;
+  background: #fff;
+  scroll-snap-align: start;
+}
+
+.dia h3 {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--display-font);
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  font-weight: 400;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.fecha {
+  display: inline-block;
+  margin: 0.35rem 0 1rem;
+  color: var(--agenda-accent-text);
+  font-size: 0.69rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Los botones de hora en cuadrícula de 2 columnas. */
+.horarios {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+/* Cada botón de hora: beige normal, marrón al pasar el mouse, verde si es el tuyo. */
+.horario {
+  position: relative;
+  min-height: 3rem;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid #d7d1ca;
+  background: #f4f1ed;
+  color: var(--gris7);
+  font-size: clamp(0.62rem, 1vw, 0.72rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.horario:not(:disabled):hover,
+.horario:not(:disabled):focus-visible {
+  border-color: var(--agenda-accent-text);
+  background: var(--agenda-accent-text);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* El horario que acabás de tocar: marrón con tilde ✓ arriba a la derecha. */
+.horario.seleccionado {
+  border-color: var(--agenda-accent-text);
+  background: var(--agenda-accent-text);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.horario.seleccionado::after {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.2rem;
+  content: "✓";
+  font-size: 0.65rem;
+}
+
+/* Horarios apagados (ya pasaron): grises, tachados, no se pueden tocar. */
+.horario:disabled,
+.horario.pasado {
+  border-color: #e4e0db;
+  background: #edeae6;
+  color: #aaa49d;
+  cursor: not-allowed;
+  opacity: 0.62;
+  text-decoration: line-through;
+}
+
+/* Ocupado: gris sin tachar, dice "OCUPADO". Propio: verde, dice "TU TURNO". */
+.horario.ocupado {
+  border-color: #d4cec7;
+  background: #ddd8d2;
+  color: var(--gris6);
+  opacity: 1;
+  text-decoration: none;
+}
+
+.horario.propio {
+  border-color: #2d7a46;
+  background: #e4f0e7;
+  color: #205733;
+  opacity: 1;
+  text-decoration: none;
+}
+
+.horario.ocupado span,
+.horario.ocupado small,
+.horario.propio span,
+.horario.propio small {
+  display: block;
+}
+
+.horario.ocupado small,
+.horario.propio small {
+  margin-top: 0.12rem;
+  color: var(--agenda-accent-text);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.horario.propio small {
+  color: #205733;
+}
+
+.dia__vacio {
+  grid-column: 1 / -1;
+  padding: 0.8rem;
+  border: 1px dashed #d7d1ca;
+  color: var(--gris5);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* -- Ventanita para pedir el turno: centrada, fondo oscuro detrás -- */
+.booking-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(calc(100% - 2rem), 44rem);
+  max-height: calc(100dvh - 2rem);
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.booking-modal::backdrop {
+  background: rgba(3, 3, 3, 0.82);
+  backdrop-filter: blur(5px);
+}
+
+.booking-modal[open] {
+  animation: modal-in 220ms ease-out both;
+}
+
+.booking-modal [hidden] {
+  display: none !important;
+}
+
+.booking-modal__card {
+  position: relative;
+  max-height: calc(100dvh - 2rem);
+  padding: clamp(2rem, 5vw, 3.8rem);
+  overflow-y: auto;
+  border-top: 5px solid var(--accent);
+  background: #f4f1ed;
+  box-shadow: 18px 18px 0 rgba(251, 121, 4, 0.18);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.booking-modal__close {
+  position: absolute;
+  z-index: 1;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  color: var(--gris5);
+  font-size: 1.8rem;
+  line-height: 1;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.booking-modal__close:hover,
+.booking-modal__close:focus-visible {
+  color: var(--agenda-accent-text);
+  transform: rotate(7deg);
+}
+
+.booking-modal__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: clamp(1.75rem, 4vw, 2.7rem);
+  padding-right: 2.5rem;
+}
+
+.booking-modal__heading > div > p {
+  margin-bottom: 0.35rem;
+  color: var(--agenda-accent-text);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.booking-modal__heading h2 {
+  font-family: var(--display-font);
+  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  font-weight: 400;
+  line-height: 0.9;
+}
+
+.booking-modal__selection {
+  flex: 0 0 auto;
+  padding-left: 1.2rem;
+  border-left: 3px solid var(--accent);
+  text-align: right;
+}
+
+.booking-modal__selection span,
+.booking-modal__selection strong {
+  display: block;
+}
+
+.booking-modal__selection span {
+  color: var(--gris5);
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
+.booking-modal__selection strong {
+  margin-top: 0.15rem;
+  color: var(--agenda-accent-text);
+  font-family: var(--display-font);
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+/* El formulario dentro de la ventanita: 2 columnas, botón negro grande abajo. */
+.booking-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.65rem 1.5rem;
+}
+
+.booking-form__field--wide,
+.booking-form__submit {
+  grid-column: 1 / -1;
+}
+
+.booking-form__field label {
+  display: block;
+  margin-bottom: 0.55rem;
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+.booking-form__field input {
+  width: 100%;
+  min-height: 3.15rem;
+  padding: 0.65rem 0;
+  border: 0;
+  border-bottom: 2px solid #bdb8b1;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.95rem;
+  transition: border-color 160ms ease;
+}
+
+.booking-form__field input::placeholder {
+  color: #97918b;
+}
+
+.booking-form__field input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.booking-form__field input:user-invalid {
+  border-bottom-color: #b42318;
+}
+
+.booking-form__help {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--gris5);
+  font-size: 0.7rem;
+}
+
+/* Cartel rojo de error dentro del formulario (ej: teléfono mal escrito). */
+.booking-form__feedback {
+  grid-column: 1 / -1;
+  padding: 0.75rem 0.9rem;
+  border-left: 4px solid #b42318;
+  background: #fff;
+  color: #7a1a13;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.booking-form__submit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.35rem;
+  margin-top: 0.7rem;
+  padding: 0 1.5rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.booking-form__submit:hover,
+.booking-form__submit:focus-visible {
+  background: var(--agenda-accent-text);
+  transform: translateY(-2px);
+}
+
+.booking-form__submit:disabled {
+  background: var(--gris5);
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
+.booking-form__submit-arrow {
+  font-size: 1.5rem;
+}
+
+.booking-form__submit-label {
+  font-size: inherit;
+}
+
+/* Pantalla de éxito "¡Turno solicitado!": círculo con tilde + mensaje. */
+.booking-success {
+  padding: clamp(1rem, 4vw, 2.5rem) 0;
+  text-align: center;
+}
+
+.booking-success > span {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 1.25rem;
+  border-radius: 50%;
+  place-items: center;
+  background: var(--agenda-accent-text);
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.booking-success h2 {
+  font-family: var(--display-font);
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.booking-success p {
+  max-width: 29rem;
+  margin: 1rem auto 1.8rem;
+  color: var(--gris5);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.booking-success button {
+  min-width: 10rem;
+  min-height: 3rem;
+  padding: 0 1rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+/* -- Ventanita roja de cancelar: borde rojo arriba, 2 botones -- */
+.cancel-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(calc(100% - 2rem), 34rem);
+  max-height: calc(100dvh - 2rem);
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.cancel-modal::backdrop {
+  background: rgba(3, 3, 3, 0.86);
+  backdrop-filter: blur(5px);
+}
+
+.cancel-modal[open] {
+  animation: modal-in 220ms ease-out both;
+}
+
+.cancel-modal__card {
+  position: relative;
+  max-height: calc(100dvh - 2rem);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  overflow-y: auto;
+  border-top: 5px solid #b42318;
+  background: #f4f1ed;
+  box-shadow: 16px 16px 0 rgba(180, 35, 24, 0.2);
+}
+
+.cancel-modal__close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  color: var(--gris5);
+  font-size: 1.7rem;
+}
+
+.cancel-modal__eyebrow {
+  margin-bottom: 0.45rem;
+  color: #9b241b;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.cancel-modal h2 {
+  padding-right: 2rem;
+  font-family: var(--display-font);
+  font-size: clamp(2.2rem, 7vw, 3.7rem);
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.cancel-modal__card > p:not(.cancel-modal__eyebrow, .cancel-modal__turn) {
+  margin-top: 1rem;
+  color: var(--gris5);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.cancel-modal__turn {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid var(--accent);
+  background: #fff;
+  font-weight: 800;
+}
+
+.cancel-modal__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.cancel-modal__actions button {
+  min-height: 3.25rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.cancel-modal__actions .cancel-modal__confirm {
+  border-color: #9b241b;
+  background: #9b241b;
+  color: #fff;
+}
+
+/* Animación de entrada: la ventanita aparece subiendo suave desde abajo. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 1rem)) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* -- Tablet: 3 días por fila, cartel de reserva en 2 columnas -- */
+@media (max-width: 1100px) {
+  #calendario {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .active-booking {
+    grid-template-columns: minmax(14rem, 1fr) minmax(11rem, 0.55fr);
+  }
+
+  .active-booking__actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* -- Celular: 2 días por fila, ventanita a pantalla casi completa -- */
+@media (max-width: 760px) {
+  .agenda {
+    padding-block: 4rem;
+  }
+
+  .agenda-header h1 {
+    font-size: clamp(3.8rem, 20vw, 5.5rem);
+  }
+
+  .agenda-panel {
+    padding: 1rem;
+    box-shadow: 8px 8px 0 rgba(251, 121, 4, 0.16);
+  }
+
+  #calendario {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+    padding-bottom: 0.15rem;
+  }
+
+  .booking-modal {
+    width: min(calc(100% - 1.25rem), 44rem);
+  }
+
+  .booking-modal__card {
+    max-height: calc(100dvh - 1.25rem);
+    padding: 1.5rem 1.25rem;
+    box-shadow: 8px 8px 0 rgba(251, 121, 4, 0.18);
+  }
+
+  .booking-modal__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .booking-modal__selection {
+    padding-left: 0.75rem;
+    text-align: left;
+  }
+
+  .booking-form {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .booking-form__field,
+  .booking-form__submit {
+    grid-column: 1;
+  }
+
+  .booking-form__submit {
+    min-height: 3.6rem;
+  }
+}
+
+/* -- Celular chico: 1 día por fila, botones grandes para el dedo -- */
+@media (max-width: 520px) {
+  .agenda-header {
+    margin-bottom: 2rem;
+  }
+
+  .active-booking {
+    grid-template-columns: 1fr;
+    gap: 1.1rem;
+    box-shadow: 8px 8px 0 rgba(45, 122, 70, 0.15);
+  }
+
+  .active-booking__date {
+    padding-left: 0.8rem;
+  }
+
+  .active-booking__actions,
+  .cancel-modal__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .active-booking__actions {
+    grid-column: auto;
+  }
+
+  #calendario {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .dia {
+    padding: 1rem;
+  }
+
+  .horario {
+    min-height: 3.25rem;
+  }
+
+  .cancel-modal {
+    width: calc(100% - 1.25rem);
+  }
+
+  .cancel-modal__card {
+    max-height: calc(100dvh - 1.25rem);
+    padding: 1.5rem 1.2rem;
+    box-shadow: 8px 8px 0 rgba(180, 35, 24, 0.2);
+  }
+}
+
+/* -- Celular mini: menos relleno para que todo entre -- */
+@media (max-width: 360px) {
+  .agenda {
+    padding-inline: 0.85rem;
+  }
+
+  .agenda-panel {
+    padding: 0.75rem;
+  }
+
+  #calendario {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-modal {
+    width: calc(100% - 1.25rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .booking-modal__card {
+    max-height: calc(100dvh - 1rem);
+    padding: 1.25rem 1rem;
+  }
+
+  .booking-modal__heading {
+    margin-bottom: 1.25rem;
+    padding-right: 2rem;
+  }
+}
+

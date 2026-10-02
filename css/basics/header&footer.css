@@ -1,0 +1,286 @@
+/* ============================================================
+   HEADER Y FOOTER: el menú de arriba y el pie de abajo
+   ------------------------------------------------------------
+   El header es la barra con los links (Nosotros, Agendar...)
+   y el logo "Street Barbershop". El footer es el cierre negro
+   con columnas de navegación, contacto y redes.
+   "flex" = poner cosas en fila. "grid" = ponerlas en cuadrícula.
+   "clamp()" = un tamaño que se adapta solo a la pantalla.
+   ============================================================ */
+
+/* -- La barra de arriba: menú a la izquierda, logo a la derecha -- */
+.site-header {
+  position: relative;
+  z-index: 10; /* queda por encima del fondo */
+  display: flex; /* pone menú y logo en fila */
+  align-items: center;
+  justify-content: space-between; /* uno a cada punta */
+  min-height: 7.25rem;
+  padding: 1.35rem max(var(--page-pad), calc((100vw - var(--page-max)) / 2));
+  background: #151515;
+}
+
+/* La lista de links del menú, en fila con aire entre ellos. */
+.site-nav ul {
+  display: flex;
+  gap: clamp(0.45rem, 1.4vw, 1.15rem);
+}
+
+/* Cada link: gris, letra de cartel, con animación de color. */
+.site-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem; /* zona táctil cómoda para el dedo */
+  padding: 0 0.15rem;
+  color: var(--gris2);
+  font-family: var(--display-font);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  transition: color 180ms ease; /* el color cambia suave, no de golpe */
+}
+
+/* La linecita naranja que aparece debajo del link. */
+/* Empieza invisible (scaleX 0) y crece al pasar el mouse. */
+.site-nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: 0.15rem;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: ""; /* los ::after necesitan esto para existir */
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 180ms ease;
+}
+
+/* Link con mouse encima, con teclado, o la página actual: blanco. */
+.site-nav a:hover,
+.site-nav a:focus-visible,
+.site-nav a[aria-current="page"] {
+  color: #fff;
+}
+
+/* En esos casos, la linecita naranja se estira completa. */
+.site-nav a:hover::after,
+.site-nav a:focus-visible::after,
+.site-nav a[aria-current="page"]::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* El logo "Street Barbershop": blanco, grueso, alineado a la derecha. */
+.brand {
+  color: #fff;
+  font-family: var(--body-font);
+  font-size: clamp(1.85rem, 4vw, 3.5rem);
+  font-weight: 900;
+  line-height: 0.77; /* letras bien pegaditas como cartel */
+  letter-spacing: -0.065em;
+  text-align: right;
+}
+
+/* -- El pie de página: fondo negro con línea arriba -- */
+.site-footer {
+  padding: clamp(4rem, 8vw, 7rem) max(var(--page-pad), calc((100vw - var(--page-max)) / 2)) 0;
+  border-top: 1px solid #292929;
+  background: #0b0b0b;
+  color: #fff;
+}
+
+/* 4 columnas: marca grande + 3 columnas chicas. */
+.site-footer__main {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1.65fr) repeat(3, minmax(8rem, 0.72fr));
+  gap: clamp(2rem, 5vw, 4.5rem);
+  padding-bottom: clamp(3.5rem, 7vw, 6rem);
+}
+
+/* Título grande naranja del footer. */
+.site-footer__brand h2 {
+  color: var(--accent);
+  font-size: clamp(2.4rem, 5vw, 4.6rem);
+  font-weight: 900;
+  line-height: 0.77;
+  letter-spacing: -0.065em;
+}
+
+/* Texto descriptivo debajo del título. */
+.site-footer__brand p {
+  max-width: 24rem;
+  margin-top: 1.6rem;
+  color: var(--gris3);
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+/* Titulitos chiquitos de cada columna (NAVEGACIÓN, CONTACTO...). */
+.site-footer h3 {
+  margin-bottom: 1.25rem;
+  color: var(--gris4);
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+/* Listas del footer: una cosa debajo de la otra con aire. */
+.site-footer__column ul,
+.site-footer__column address {
+  display: grid;
+  gap: 0.8rem;
+}
+
+/* La dirección: gris, sin cursiva (los address vienen en cursiva por defecto). */
+.site-footer__column address {
+  color: var(--gris2);
+  font-size: 0.8rem;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+/* Links del footer: letra de cartel, se vuelven naranjas al pasar el mouse. */
+.site-footer__column a {
+  color: var(--paper);
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  transition: color 180ms ease;
+}
+
+.site-footer__column a:hover,
+.site-footer__column a:focus-visible {
+  color: var(--accent);
+}
+
+/* Los links dentro de la dirección usan letra normal para que el mail se lea bien. */
+.site-footer__column address a {
+  overflow-wrap: anywhere; /* si el mail es largo, se parte y no rompe la página */
+  font-family: var(--body-font);
+  font-size: inherit;
+  letter-spacing: 0;
+}
+
+/* Redes sociales: cada fila con línea abajo y flecha naranja. */
+.site-footer__social a {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid #292929;
+}
+
+.site-footer__social a span {
+  color: var(--accent);
+}
+
+/* Barra final: copyright a la izquierda, "volver arriba" a la derecha. */
+.site-footer__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  min-height: 5rem;
+  border-top: 1px solid #292929;
+  color: var(--gris4);
+  font-size: 0.67rem;
+  letter-spacing: 0.04em;
+}
+
+.site-footer__bottom a {
+  color: var(--paper);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.site-footer__bottom a span {
+  margin-left: 0.35rem;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+/* -- Adaptación a pantallas: de 4 columnas a 2 en tablet -- */
+@media (max-width: 900px) {
+  .site-footer__main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-footer__brand {
+    grid-column: 1 / -1; /* la marca ocupa todo el ancho arriba */
+  }
+}
+
+/* -- En celular: menú en cuadrícula 2x2 con botones naranjas -- */
+@media (max-width: 760px) {
+  .site-header {
+    align-items: center;
+    min-height: 7rem;
+    padding-block: 1.1rem;
+  }
+
+  .site-nav ul {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.25rem 0.75rem;
+  }
+
+  .site-nav a {
+    min-height: 2.4rem;
+    padding: 0.45rem 0.65rem;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.66rem;
+    letter-spacing: 0.055em;
+  }
+
+  .site-nav a::after {
+    display: none; /* sin linecita en celular, ya son botones */
+  }
+
+  .brand {
+    font-size: clamp(1.75rem, 8vw, 2.7rem);
+  }
+
+  .site-footer__main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-footer__brand {
+    grid-column: 1 / -1;
+  }
+}
+
+/* -- En pantallas muy angostas: footer de 1 columna -- */
+@media (max-width: 560px) {
+  .site-footer__main {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer__brand {
+    grid-column: auto;
+  }
+}
+
+/* -- En celulares mini: header más bajo y barra final en vertical -- */
+@media (max-width: 420px) {
+  .site-header {
+    min-height: 6.5rem;
+  }
+
+  .site-nav ul {
+    gap: 0.16rem 0.4rem;
+  }
+
+  .site-nav a {
+    min-height: 2.25rem;
+    padding-inline: 0.45rem;
+    font-size: 0.6rem;
+  }
+
+  .site-footer__bottom {
+    align-items: flex-start;
+    flex-direction: column-reverse;
+    gap: 0.8rem;
+    padding-block: 1.4rem;
+  }
+}
