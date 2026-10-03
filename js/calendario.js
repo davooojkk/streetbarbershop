@@ -1,18 +1,15 @@
 // ============================================================
-// CALENDARIO: el cerebro de la página agenda.html
+// CALENDARIO: agenda que habla con Supabase vía RPC (modelo seguro)
 // ------------------------------------------------------------
-// Imaginá esta página como una cartelera con botones de horarios.
-// Este archivo hace todo:
-// 1) Dibuja los próximos 5 días abiertos con sus horarios.
-// 2) Abre la ventanita (modal) para pedir un turno.
-// 3) Guarda, cambia o cancela tu turno (solo uno activo a la vez).
-// 4) Muestra mensajes de éxito o error.
-// Trabaja en equipo con calendario-fechas.js (fechas),
-// reservas-temporales.js (memoria) y validacion.js (revisar datos).
+// Regla de oro: el navegador PIDE, la base DECIDE.
+// - Ver horas libres → RPC obtener_disponibilidad (sin PII).
+// - Reservar → RPC crear_reserva (valida todo en servidor).
+// - Cambiar → RPC cambiar_con_token (atómica: o todo o nada).
+// - Cancelar → RPC cancelar_con_token (conserva historial).
+// Mi turno + secretos viven en localStorage (request/token los
+// genera el cliente ANTES de llamar, por si la respuesta se pierde).
 // ============================================================
 
-// -- Paso 1: pedir prestadas las herramientas de fechas --
-// Es como sacar herramientas de una caja para usarlas aquí.
 const {
   crearFechaDesdeValor,
   diasSemana,
@@ -21,159 +18,149 @@ const {
   formatearFechaValor,
   horarios,
   horarioYaPaso,
-  obtenerIdTurno,
   obtenerProximosDiasAbiertos,
   turnoYaPaso,
 } = globalThis.CalendarioFechas;
 
-// -- Paso 2: buscar todos los carteles y botones de la página --
-// "document.querySelector" = "buscame este elemento en el HTML".
-// Guardamos cada uno en una variable para no buscarlo mil veces.
-const calendario = document.querySelector("#calendario"); // la cartelera principal
-const estadoAgenda = document.querySelector("#agenda-status"); // cartel de mensajes (éxito/error)
-const modalTurno = document.querySelector("#booking-modal"); // ventanita para pedir turno
-const formularioTurno = document.querySelector("#booking-form"); // formulario nombre + teléfono
-const confirmacionTurno = document.querySelector("#booking-success"); // cartel de "¡listo!"
+const calendario = document.querySelector("#calendario");
+const estadoAgenda = document.querySelector("#agenda-status");
+const modalTurno = document.querySelector("#booking-modal");
+const formularioTurno = document.querySelector("#booking-form");
+const confirmacionTurno = document.querySelector("#booking-success");
 const mensajeConfirmacion = document.querySelector("#booking-success-message");
-const textoFecha = document.querySelector("#turno-fecha"); // texto lindo de la fecha elegida
-const textoHora = document.querySelector("#turno-hora"); // texto lindo de la hora elegida
-const campoFecha = document.querySelector("#turno-fecha-value"); // campo oculto con fecha
-const campoHora = document.querySelector("#turno-hora-value"); // campo oculto con hora
+const textoFecha = document.querySelector("#turno-fecha");
+const textoHora = document.querySelector("#turno-hora");
+const campoFecha = document.querySelector("#turno-fecha-value");
+const campoHora = document.querySelector("#turno-hora-value");
 const campoNombre = document.querySelector("#turno-nombre");
 const campoTelefono = document.querySelector("#turno-telefono");
-const feedbackFormulario = document.querySelector("#booking-form-feedback"); // cartel rojo de errores
+const feedbackFormulario = document.querySelector("#booking-form-feedback");
 const botonEnviar = document.querySelector("[data-submit-turno]");
 const etiquetaBotonEnviar = document.querySelector("[data-submit-label]");
 const textoSuperiorModal = document.querySelector("[data-modal-eyebrow]");
 const tituloModal = document.querySelector("#booking-modal-title");
 const tituloConfirmacion = document.querySelector("[data-success-title]");
-const reservaActivaPanel = document.querySelector("#active-booking"); // cartel superior "tu reserva"
+const reservaActivaPanel = document.querySelector("#active-booking");
 const reservaActivaFecha = document.querySelector("#active-booking-date");
 const reservaActivaDia = document.querySelector("#active-booking-day");
 const reservaActivaHora = document.querySelector("#active-booking-time");
 const botonCambiarTurno = document.querySelector("[data-change-turno]");
 const botonCancelarTurno = document.querySelector("[data-cancel-turno]");
-const modalCancelacion = document.querySelector("#cancel-modal"); // ventanita "¿seguro cancelar?"
+const modalCancelacion = document.querySelector("#cancel-modal");
 const textoTurnoCancelacion = document.querySelector("#cancel-modal-turn");
 const botonConfirmarCancelacion = document.querySelector("[data-confirm-cancel]");
 
-// -- Paso 3: memoria de lo que está pasando ahora --
-const almacenReservas = globalThis.ReservasTemporales;
-const turnosReservados = almacenReservas?.obtenerIds() ?? new Set(); // lista de ocupados
-let reservaActiva = almacenReservas?.obtenerUltimaReserva() ?? null; // mi turno actual (o null)
-let turnoSeleccionado = null; // el horario que acabo de tocar (todavía no confirmado)
-let horarioSeleccionado = null; // el botón que toqué (para pintarlo distinto)
-let enviandoFormulario = false; // candado para no enviar 2 veces seguidas
-let modoReprogramacion = false; // true cuando estoy cambiando mi turno por otro
-
-// -- Paso 4: datos que vienen de la página principal --
-// Si en index.html escribiste tu nombre, lo traemos para no pedirlo de nuevo.
-const datosIniciales = {
-  nombre: "",
-  telefono: "",
-};
-
-try {
-  // Intentamos leer lo que home.js guardó en la memoria de la pestaña.
-  const datosGuardados = JSON.parse(
-    sessionStorage.getItem("streetBarberPrefill") ?? "null",
-  );
-
-  if (datosGuardados && typeof datosGuardados === "object") {
-    datosIniciales.nombre = datosGuardados.nombre ?? "";
-    datosIniciales.telefono = datosGuardados.telefono ?? "";
-  }
-} catch {
-  // La agenda sigue disponible aunque el navegador bloquee sessionStorage.
+// -- Cliente nube (o null si falta configurar js/supabase-client.js) --
+function sb() {
+  const c = globalThis.supabaseBarberia;
+  if (!c || !window.supabase) return null;
+  try {
+    if ((c.supabaseUrl || "").includes("PEGÁ-ACÁ")) return null;
+  } catch { /* seguimos */ }
+  return c;
 }
 
-// También aceptamos datos que vengan en la dirección web (?nombre=...).
-// Es el plan B por si la memoria de arriba falló.
-const parametros = new URLSearchParams(window.location.search);
+// Llama una RPC y devuelve { fila, codigoError }.
+// codigoError es el texto del RAISE (SLOT_OCUPADO, TOPE_POR_TELEFONO, ...).
+async function llamarRpc(nombre, args) {
+  const cliente = sb();
+  if (!cliente) return { fila: null, codigoError: "SIN_NUBE" };
+  const { data, error } = await cliente.rpc(nombre, args);
+  if (error) return { fila: null, codigoError: error.message || "ERROR_RED" };
+  const fila = Array.isArray(data) ? data[0] ?? null : data;
+  return { fila, codigoError: null };
+}
 
+// -- Estado en memoria + mi turno guardado --
+const CLAVE_MI_TURNO = "streetBarberMiTurno";
+const ocupados = new Set(); // slotKeys "AAAA-MM-DD|HH:MM" ocupados según la nube
+let miTurno = null; // { id, token, fecha, hora, fechaVisible, nombre, telefono }
+let turnoSeleccionado = null;
+let horarioSeleccionado = null;
+let enviandoFormulario = false;
+let modoReprogramacion = false;
+
+function llaveSlot(fechaValor, hora) {
+  return `${fechaValor}|${hora}`;
+}
+
+function leerMiTurno() {
+  try {
+    const t = JSON.parse(localStorage.getItem(CLAVE_MI_TURNO) ?? "null");
+    if (t?.id && t?.token && t?.fecha && t?.hora) return t;
+  } catch { /* sin storage seguimos sin turno */ }
+  return null;
+}
+
+function guardarMiTurno(t) {
+  miTurno = t;
+  try {
+    if (t) localStorage.setItem(CLAVE_MI_TURNO, JSON.stringify(t));
+    else localStorage.removeItem(CLAVE_MI_TURNO);
+  } catch { /* solo memoria */ }
+}
+
+miTurno = leerMiTurno();
+
+// -- Prefill desde la home (nombre/teléfono, NO el turno) --
+const datosIniciales = { nombre: "", telefono: "" };
+try {
+  const g = JSON.parse(sessionStorage.getItem("streetBarberPrefill") ?? "null");
+  if (g && typeof g === "object") {
+    datosIniciales.nombre = g.nombre ?? "";
+    datosIniciales.telefono = g.telefono ?? "";
+  }
+} catch { /* la agenda anda igual */ }
+const parametros = new URLSearchParams(window.location.search);
 datosIniciales.nombre ||= parametros.get("nombre") ?? "";
 datosIniciales.telefono ||= parametros.get("telefono") ?? "";
-
-// Si la dirección traía datos, la limpiamos para que no se vean tus datos.
-// Ejemplo: "agenda.html?nombre=Ana" → "agenda.html#calendario".
 if (parametros.size > 0) {
   try {
     history.replaceState(null, "", `${window.location.pathname}#calendario`);
-  } catch {
-    // Abrir el archivo directamente no impide utilizar la agenda.
+  } catch { /* igual */ }
+}
+
+// -- ¿Mi turno guardado sigue en el futuro? Si no, se olvida solo. --
+function miTurnoVigente(ahora = new Date()) {
+  if (!miTurno) return false;
+  const fecha = crearFechaDesdeValor(miTurno.fecha);
+  if (!fecha || !miTurno.hora || turnoYaPaso(fecha, miTurno.hora, ahora)) {
+    guardarMiTurno(null);
+    return false;
   }
+  return true;
 }
+miTurnoVigente();
 
-// -- ¿Mi reserva guardada todavía vale? --
-// Una reserva vieja (ej: ayer a las 10) ya no vale. Devuelve true/false.
-function reservaSigueVigente(reserva, ahora = new Date()) {
-  const fecha = reserva?.fecha
-    ? crearFechaDesdeValor(reserva.fecha)
-    : null;
-
-  return Boolean(
-    fecha && reserva?.hora && !turnoYaPaso(fecha, reserva.hora, ahora),
-  );
-}
-
-// Si al abrir la página mi reserva ya venció, la borramos para liberar el horario.
-if (reservaActiva && !reservaSigueVigente(reservaActiva)) {
-  turnosReservados.delete(reservaActiva.id);
-  almacenReservas?.cancelar(reservaActiva.id);
-  reservaActiva = null;
-}
-
-// -- Dibujar el cartel superior "TU RESERVA" (o esconderlo si no tengo) --
 function actualizarPanelReserva() {
-  if (!reservaActivaPanel) {
-    return;
-  }
-
-  // Sin reserva vigente → esconder el cartel.
-  if (!reservaActiva || !reservaSigueVigente(reservaActiva)) {
+  if (!reservaActivaPanel) return;
+  if (!miTurno || !miTurnoVigente()) {
     reservaActivaPanel.hidden = true;
     reservaActivaPanel.classList.remove("active-booking--changing");
     return;
   }
-
-  // Con reserva → mostrar fecha y hora, y cambiar el botón según el modo.
-  const fecha = crearFechaDesdeValor(reservaActiva.fecha);
-
+  const fecha = crearFechaDesdeValor(miTurno.fecha);
   reservaActivaPanel.hidden = false;
-  reservaActivaPanel.classList.toggle(
-    "active-booking--changing",
-    modoReprogramacion,
-  );
+  reservaActivaPanel.classList.toggle("active-booking--changing", modoReprogramacion);
   reservaActivaDia.textContent = formatearFechaLarga(fecha);
-  reservaActivaHora.textContent = `${reservaActiva.hora} hs`;
-  reservaActivaFecha.dateTime = `${reservaActiva.fecha}T${reservaActiva.hora}`;
-  botonCambiarTurno.textContent = modoReprogramacion
-    ? "CANCELAR CAMBIO"
-    : "CAMBIAR TURNO";
+  reservaActivaHora.textContent = `${miTurno.hora} hs`;
+  reservaActivaFecha.dateTime = `${miTurno.fecha}T${miTurno.hora}`;
+  botonCambiarTurno.textContent = modoReprogramacion ? "CANCELAR CAMBIO" : "CAMBIAR TURNO";
 }
 
-// -- Cambiar los títulos de la ventanita según lo que estoy haciendo --
-// No es lo mismo pedir un turno nuevo que cambiar el que ya tengo.
 function configurarModalReserva() {
-  const cambiando = Boolean(reservaActiva && modoReprogramacion);
-
-  textoSuperiorModal.textContent = cambiando
-    ? "ELEGISTE UN NUEVO HORARIO"
-    : "COMPLETÁ TUS DATOS";
+  const cambiando = Boolean(miTurno && modoReprogramacion);
+  textoSuperiorModal.textContent = cambiando ? "ELEGISTE UN NUEVO HORARIO" : "COMPLETÁ TUS DATOS";
   tituloModal.textContent = cambiando ? "Cambiá tu turno" : "Reservá tu turno";
-  etiquetaBotonEnviar.textContent = cambiando
-    ? "CONFIRMAR CAMBIO"
-    : "QUIERO MI TURNO";
+  etiquetaBotonEnviar.textContent = cambiando ? "CONFIRMAR CAMBIO" : "QUIERO MI TURNO";
 }
 
-// -- Mostrar un mensaje en la cartelera (verde de éxito, rojo de error, etc.) --
 function mostrarEstadoAgenda(mensaje, tipo = "info") {
   estadoAgenda.textContent = mensaje;
   estadoAgenda.dataset.tipo = tipo;
   estadoAgenda.hidden = !mensaje;
 }
 
-// -- Mostrar / esconder el cartelito rojo dentro del formulario --
 function mostrarErrorFormulario(mensaje) {
   feedbackFormulario.textContent = mensaje;
   feedbackFormulario.hidden = false;
@@ -184,296 +171,159 @@ function ocultarErrorFormulario() {
   feedbackFormulario.hidden = true;
 }
 
-// -- Devolver el botón de enviar a su estado normal (habilitado) --
 function restablecerBotonEnviar() {
   enviandoFormulario = false;
   botonEnviar.disabled = false;
   botonEnviar.removeAttribute("aria-busy");
 }
 
-// -- Averiguar en qué estado está un horario --
-// Respuestas posibles:
-// - "propio": es MI turno actual.
-// - "ocupado": lo pidió alguien (o yo en esta memoria).
-// - "pasado": la hora ya pasó hoy.
-// - "seleccionado": lo acabo de tocar.
-// - "disponible": libre para pedir.
-function obtenerEstadoTurno(fecha, hora, ahora = new Date()) {
-  const idTurno = obtenerIdTurno(fecha, hora);
-
-  if (reservaActiva?.id === idTurno && reservaSigueVigente(reservaActiva, ahora)) {
+// turnedo: propio (mío) / ocupado (nube) / pasado / seleccionado / disponible
+function obtenerEstadoTurno(fechaObj, fechaValor, hora, ahora = new Date()) {
+  if (miTurno && miTurnoVigente(ahora) && miTurno.fecha === fechaValor && miTurno.hora === hora) {
     return "propio";
   }
-
-  if (turnosReservados.has(idTurno)) {
-    return "ocupado";
-  }
-
-  if (horarioYaPaso(fecha, hora, ahora)) {
-    return "pasado";
-  }
-
-  if (turnoSeleccionado?.id === idTurno) {
-    return "seleccionado";
-  }
-
+  if (ocupados.has(llaveSlot(fechaValor, hora))) return "ocupado";
+  if (horarioYaPaso(fechaObj, hora, ahora)) return "pasado";
+  if (turnoSeleccionado && turnoSeleccionado.llave === llaveSlot(fechaValor, hora)) return "seleccionado";
   return "disponible";
 }
 
-// -- Cuando tocás un horario: abrir la ventanita para pedirlo --
-function abrirFormularioTurno(fecha, hora, boton) {
-  const idTurno = obtenerIdTurno(fecha, hora);
-  const estadoTurno = obtenerEstadoTurno(fecha, hora);
-
-  // Freno de seguridad: si la ventanita ya está abierta, el botón está
-  // apagado, o el turno no está libre, no hacemos nada.
-  if (
-    modalTurno.open ||
-    boton.disabled ||
-    (estadoTurno !== "disponible" && estadoTurno !== "seleccionado")
-  ) {
+function abrirFormularioTurno(fechaObj, fechaValor, fechaVisible, hora, boton) {
+  const estadoTurno = obtenerEstadoTurno(fechaObj, fechaValor, hora);
+  if (modalTurno.open || boton.disabled || (estadoTurno !== "disponible" && estadoTurno !== "seleccionado")) {
     return;
   }
-
-  // Regla de oro: solo 1 turno activo. Si ya tenés uno y no estás en modo
-  // "cambiar", te mandamos al cartel superior en vez de abrir el formulario.
-  if (reservaActiva && !modoReprogramacion) {
-    mostrarEstadoAgenda(
-      "Ya tenés un turno activo. Podés cambiarlo o cancelarlo desde el panel superior.",
-      "info",
-    );
+  if (miTurno && miTurnoVigente() && !modoReprogramacion) {
+    mostrarEstadoAgenda("Ya tenés un turno activo. Podés cambiarlo o cancelarlo desde el panel superior.", "info");
     reservaActivaPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
     botonCambiarTurno?.focus({ preventScroll: true });
     return;
   }
-
-  // Guardamos qué turno elegiste, con su fecha linda para mostrar.
-  turnoSeleccionado = {
-    id: idTurno,
-    fecha: formatearFechaValor(fecha),
-    fechaVisible: formatearFechaLarga(fecha),
-    hora,
-  };
-
-  // Pintamos el botón tocado como "seleccionado" y despintamos el anterior.
+  turnoSeleccionado = { llave: llaveSlot(fechaValor, hora), fecha: fechaValor, fechaVisible, hora };
   horarioSeleccionado?.classList.remove("seleccionado");
   horarioSeleccionado?.setAttribute("aria-pressed", "false");
   horarioSeleccionado = boton;
   horarioSeleccionado.classList.add("seleccionado");
-  horarioSeleccionado.dataset.estado = "seleccionado";
   horarioSeleccionado.setAttribute("aria-pressed", "true");
-  horarioSeleccionado.setAttribute(
-    "aria-label",
-    `${turnoSeleccionado.fechaVisible}, ${hora}, seleccionado`,
-  );
+  horarioSeleccionado.setAttribute("aria-label", `${fechaVisible}, ${hora}, seleccionado`);
 
-  // Preparamos el formulario: lo limpiamos, sacamos errores viejos,
-  // y pre-llenamos nombre/teléfono si ya los sabemos.
   formularioTurno.reset();
   campoNombre.setCustomValidity("");
   campoTelefono.setCustomValidity("");
-  campoNombre.value = modoReprogramacion
-    ? reservaActiva?.nombre ?? datosIniciales.nombre
-    : datosIniciales.nombre;
-  campoTelefono.value = modoReprogramacion
-    ? reservaActiva?.telefono ?? datosIniciales.telefono
-    : datosIniciales.telefono;
+  campoNombre.value = modoReprogramacion ? miTurno?.nombre ?? datosIniciales.nombre : datosIniciales.nombre;
+  campoTelefono.value = modoReprogramacion ? miTurno?.telefono ?? datosIniciales.telefono : datosIniciales.telefono;
   formularioTurno.hidden = false;
   confirmacionTurno.hidden = true;
   ocultarErrorFormulario();
   restablecerBotonEnviar();
   configurarModalReserva();
-
-  // Mostramos en la ventanita qué día y hora elegiste.
-  textoFecha.textContent = turnoSeleccionado.fechaVisible;
+  textoFecha.textContent = fechaVisible;
   textoHora.textContent = `${hora} hs`;
-  campoFecha.value = turnoSeleccionado.fecha;
-  campoHora.value = turnoSeleccionado.hora;
-
-  // Abrimos la ventanita y llevamos el cursor al campo nombre.
+  campoFecha.value = fechaValor;
+  campoHora.value = hora;
   modalTurno.showModal();
   document.body.classList.add("modal-open");
   campoNombre.focus();
 }
 
-// -- Cerrar la ventanita de pedir turno --
 function cerrarFormularioTurno() {
-  if (modalTurno.open) {
-    modalTurno.close();
-  }
+  if (modalTurno.open) modalTurno.close();
 }
 
-// -- Dibujar toda la cartelera: 5 días con sus botones de horarios --
-// Esta es la función más importante: crea las columnas de días y los botones.
-// Los horarios que ya pasaron no se dibujan. Los ocupados se dibujan apagados.
 function generarCalendario(ahora = new Date()) {
   calendario.innerHTML = "";
-
   const dias = obtenerProximosDiasAbiertos(ahora, 5);
-
-  dias.forEach((fecha) => {
-    // Creamos los elementos nuevos desde cero (columna, título, fecha, caja de botones).
+  dias.forEach((fechaObj) => {
+    const fechaValor = formatearFechaValor(fechaObj);
     const columna = document.createElement("section");
     const nombreDia = document.createElement("h3");
     const fechaTexto = document.createElement("time");
-    const contenedorHorarios = document.createElement("div");
-    const idDia = `dia-${formatearFechaValor(fecha)}`;
-    let cantidadHorarios = 0;
-
+    const caja = document.createElement("div");
+    const idDia = `dia-${fechaValor}`;
+    let n = 0;
     columna.classList.add("dia");
     columna.setAttribute("aria-labelledby", idDia);
-
     nombreDia.id = idDia;
-    nombreDia.textContent = diasSemana[fecha.getDay()];
-
+    nombreDia.textContent = diasSemana[fechaObj.getDay()];
     fechaTexto.classList.add("fecha");
-    fechaTexto.dateTime = formatearFechaValor(fecha);
-    fechaTexto.textContent = formatearFecha(fecha);
+    fechaTexto.dateTime = fechaValor;
+    fechaTexto.textContent = formatearFecha(fechaObj);
+    caja.classList.add("horarios");
+    const fechaVisible = formatearFechaLarga(fechaObj);
 
-    contenedorHorarios.classList.add("horarios");
-
-    // Por cada hora del día (08:00, 09:00...), creamos un botón.
     horarios.forEach((hora) => {
-      const estadoTurno = obtenerEstadoTurno(fecha, hora, ahora);
-
-      // Los horarios pasados de hoy no se muestran (la consigna lo pide).
-      if (estadoTurno === "pasado") {
-        return;
-      }
-
+      const estadoTurno = obtenerEstadoTurno(fechaObj, fechaValor, hora, ahora);
+      if (estadoTurno === "pasado") return;
+      n += 1;
       const boton = document.createElement("button");
-      const idTurno = obtenerIdTurno(fecha, hora);
-      const descripcionFecha = formatearFechaLarga(fecha);
-
-      cantidadHorarios += 1;
       boton.classList.add("horario");
       boton.type = "button";
       boton.dataset.estado = estadoTurno;
-      boton.dataset.turnoId = idTurno;
-
-      // Botones apagados: ocupados o el mío. Muestran "OCUPADO" / "TU TURNO".
       if (estadoTurno === "ocupado" || estadoTurno === "propio") {
-        const horaTurno = document.createElement("span");
-        const estadoTexto = document.createElement("small");
-
-        horaTurno.textContent = hora;
-        estadoTexto.textContent =
-          estadoTurno === "propio" ? "TU TURNO" : "OCUPADO";
-        boton.append(horaTurno, estadoTexto);
+        const h = document.createElement("span");
+        const e = document.createElement("small");
+        h.textContent = hora;
+        e.textContent = estadoTurno === "propio" ? "TU TURNO" : "OCUPADO";
+        boton.append(h, e);
         boton.disabled = true;
         boton.classList.add(estadoTurno);
-        boton.setAttribute(
-          "aria-label",
-          `${descripcionFecha}, ${hora}, ${estadoTurno === "propio" ? "tu turno" : "ocupado"}`,
-        );
+        boton.setAttribute("aria-label", `${fechaVisible}, ${hora}, ${estadoTurno === "propio" ? "tu turno" : "ocupado"}`);
       } else {
-        // Botones libres: se pueden tocar para abrir el formulario.
         boton.textContent = hora;
-        boton.setAttribute(
-          "aria-label",
-          `${descripcionFecha}, ${hora}, ${estadoTurno}`,
-        );
-        boton.setAttribute(
-          "aria-pressed",
-          estadoTurno === "seleccionado" ? "true" : "false",
-        );
-
-        if (estadoTurno === "seleccionado") {
-          boton.classList.add("seleccionado");
-        }
-
-        boton.addEventListener("click", () => {
-          abrirFormularioTurno(fecha, hora, boton);
-        });
+        boton.setAttribute("aria-label", `${fechaVisible}, ${hora}, ${estadoTurno}`);
+        boton.setAttribute("aria-pressed", estadoTurno === "seleccionado" ? "true" : "false");
+        if (estadoTurno === "seleccionado") boton.classList.add("seleccionado");
+        boton.addEventListener("click", () => abrirFormularioTurno(fechaObj, fechaValor, fechaVisible, hora, boton));
       }
-
-      contenedorHorarios.appendChild(boton);
+      caja.appendChild(boton);
     });
 
-    // Si un día se quedó sin botones (todo pasó), mostramos un cartelito.
-    if (cantidadHorarios === 0) {
-      const sinHorarios = document.createElement("p");
-
-      sinHorarios.classList.add("dia__vacio");
-      sinHorarios.textContent = "Sin horarios disponibles por hoy.";
-      contenedorHorarios.appendChild(sinHorarios);
+    if (n === 0) {
+      const p = document.createElement("p");
+      p.classList.add("dia__vacio");
+      p.textContent = "Sin horarios disponibles por hoy.";
+      caja.appendChild(p);
     }
-
-    columna.append(nombreDia, fechaTexto, contenedorHorarios);
+    columna.append(nombreDia, fechaTexto, caja);
     calendario.appendChild(columna);
   });
 }
 
-// -- Hablar con Supabase si está configurado (sin romper lo local) --
-// Devuelve el cliente o null si todavía no pegaste URL/KEY.
-function nube() {
-  const c = globalThis.supabaseBarberia;
-  if (!c) return null;
-  // Si dejaste el texto "PEGÁ-ACÁ", es como no tener nada.
-  try {
-    const url = c.supabaseUrl || "";
-    if (url.includes("PEGÁ-ACÁ")) return null;
-  } catch { /* seguimos igual */ }
-  return c;
-}
-
-// -- Traer ocupados de la nube para los 5 días y mezclarlos con los locales --
-// Así si otro celu reservó, a vos también te aparece ocupado.
-async function sincronizarNube() {
-  try {
-    const cliente = nube();
-    if (!cliente) return;
-    const dias = obtenerProximosDiasAbiertos(new Date(), 5).map(formatearFechaValor);
-    const desde = dias[0];
-    const hasta = dias[dias.length - 1];
-    const { data, error } = await cliente
-      .from("reservas")
-      .select("id")
-      .gte("fecha", desde)
-      .lte("fecha", hasta)
-      .neq("estado", "cancelado");
-    if (error || !data) return;
-    data.forEach((r) => turnosReservados.add(r.id));
-  } catch {
-    // Sin internet o sin keys seguimos con lo local, la página no se rompe.
+// -- Trae ocupados de la nube (solo hora+ocupado, sin PII) y redibuja --
+async function cargarDisponibilidad() {
+  const cliente = sb();
+  if (!cliente) {
+    mostrarEstadoAgenda("Sin conexión a la nube: revisá js/supabase-client.js. Mostrando vista local.", "error");
+    return;
   }
+  try {
+    const dias = obtenerProximosDiasAbiertos(new Date(), 5);
+    for (const d of dias) {
+      const valor = formatearFechaValor(d);
+      const { data, error } = await cliente.rpc("obtener_disponibilidad", { dia: valor });
+      if (error || !data) continue;
+      data.forEach((h) => {
+        if (h.ocupado) ocupados.add(llaveSlot(valor, h.hora));
+      });
+    }
+  } catch { /* la cartelera local sigue útil */ }
 }
 
-// -- Arranque: dibujamos enseguida lo local y después sumamos la nube --
 actualizarPanelReserva();
 generarCalendario();
-sincronizarNube().then(() => generarCalendario());
-
-// -- Botones "X" para cerrar la ventanita --
-document.querySelectorAll("[data-close-modal]").forEach((boton) => {
-  boton.addEventListener("click", cerrarFormularioTurno);
+cargarDisponibilidad().then(() => {
+  actualizarPanelReserva();
+  generarCalendario();
 });
 
-// Si tocás fuera de la tarjeta (el fondo oscuro), también se cierra.
-modalTurno.addEventListener("click", (evento) => {
-  if (evento.target === modalTurno) {
-    cerrarFormularioTurno();
-  }
+document.querySelectorAll("[data-close-modal]").forEach((b) => b.addEventListener("click", cerrarFormularioTurno));
+modalTurno.addEventListener("click", (e) => {
+  if (e.target === modalTurno) cerrarFormularioTurno();
 });
-
-// -- Cuando se cierra la ventanita: limpiar todo --
-// Despintamos el botón, olvidamos el turno tocado, limpiamos errores
-// y dejamos el botón de enviar habilitado para la próxima vez.
 modalTurno.addEventListener("close", () => {
-  if (!modalCancelacion.open) {
-    document.body.classList.remove("modal-open");
-  }
+  if (!modalCancelacion.open) document.body.classList.remove("modal-open");
   horarioSeleccionado?.classList.remove("seleccionado");
   horarioSeleccionado?.setAttribute("aria-pressed", "false");
-
-  if (horarioSeleccionado) {
-    horarioSeleccionado.dataset.estado = "disponible";
-    horarioSeleccionado.setAttribute(
-      "aria-label",
-      `${turnoSeleccionado?.fechaVisible ?? "Turno"}, ${turnoSeleccionado?.hora ?? ""}, disponible`,
-    );
-  }
-
   horarioSeleccionado = null;
   turnoSeleccionado = null;
   formularioTurno.reset();
@@ -485,226 +335,166 @@ modalTurno.addEventListener("close", () => {
   restablecerBotonEnviar();
 });
 
-// -- Botón "CAMBIAR TURNO": entrar/salir del modo cambio --
 botonCambiarTurno?.addEventListener("click", () => {
-  if (!reservaActiva) {
-    return;
-  }
-
+  if (!miTurno) return;
   modoReprogramacion = !modoReprogramacion;
   actualizarPanelReserva();
   generarCalendario();
-
   mostrarEstadoAgenda(
     modoReprogramacion
       ? "Elegí un nuevo horario. Tu turno actual se mantiene hasta que confirmes el cambio."
       : "Cancelaste el cambio. Tu turno actual se mantiene sin modificaciones.",
     "info",
   );
-
-  if (modoReprogramacion) {
-    calendario.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  if (modoReprogramacion) calendario.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-// -- Botón "CANCELAR TURNO": abrir la ventanita de confirmación --
 botonCancelarTurno?.addEventListener("click", () => {
-  if (!reservaActiva || modalTurno.open || modalCancelacion.open) {
-    return;
-  }
-
-  textoTurnoCancelacion.textContent =
-    `${reservaActiva.fechaVisible} · ${reservaActiva.hora} hs`;
+  if (!miTurno || modalTurno.open || modalCancelacion.open) return;
+  textoTurnoCancelacion.textContent = `${miTurno.fechaVisible} · ${miTurno.hora} hs`;
   modalCancelacion.showModal();
   document.body.classList.add("modal-open");
   modalCancelacion.querySelector("[data-close-cancel]")?.focus();
 });
 
-// -- Cerrar la ventanita de cancelación --
 function cerrarModalCancelacion() {
-  if (modalCancelacion.open) {
-    modalCancelacion.close();
-  }
+  if (modalCancelacion.open) modalCancelacion.close();
 }
-
-document.querySelectorAll("[data-close-cancel]").forEach((boton) => {
-  boton.addEventListener("click", cerrarModalCancelacion);
+document.querySelectorAll("[data-close-cancel]").forEach((b) => b.addEventListener("click", cerrarModalCancelacion));
+modalCancelacion.addEventListener("click", (e) => {
+  if (e.target === modalCancelacion) cerrarModalCancelacion();
 });
-
-modalCancelacion.addEventListener("click", (evento) => {
-  if (evento.target === modalCancelacion) {
-    cerrarModalCancelacion();
-  }
-});
-
 modalCancelacion.addEventListener("close", () => {
-  if (!modalTurno.open) {
-    document.body.classList.remove("modal-open");
-  }
+  if (!modalTurno.open) document.body.classList.remove("modal-open");
 });
 
-// -- Botón rojo "SÍ, CANCELAR": borrar mi turno de verdad (local + nube) --
+// Cancela con tu token: la fila queda como historial, el slot se libera.
 botonConfirmarCancelacion?.addEventListener("click", async () => {
-  if (!reservaActiva) {
+  if (!miTurno) {
     cerrarModalCancelacion();
     return;
   }
-
-  const reservaCancelada = { ...reservaActiva };
-
-  // Guardamos en la nube como "cancelado" (NO borramos: queda historial).
-  // Así el dashboard puede contar quién cancela más.
-  try {
-    await nube()?.from("reservas").update({ estado: "cancelado" }).eq("id", reservaCancelada.id);
-  } catch { /* seguimos con lo local */ }
-
-  if (!almacenReservas?.cancelar(reservaCancelada.id)) {
-    mostrarEstadoAgenda(
-      "No pudimos cancelar el turno. Recargá la página e intentá nuevamente.",
-      "error",
-    );
+  const cancelada = { ...miTurno };
+  const { codigoError } = await llamarRpc("cancelar_con_token", { p_id: cancelada.id, p_token: cancelada.token });
+  if (codigoError) {
+    mostrarEstadoAgenda("No pudimos cancelar. Revisá tu conexión e intentá de nuevo.", "error");
     cerrarModalCancelacion();
     return;
   }
-
-  turnosReservados.delete(reservaCancelada.id);
-  reservaActiva = null;
+  guardarMiTurno(null);
+  ocupados.delete(llaveSlot(cancelada.fecha, cancelada.hora));
   modoReprogramacion = false;
   cerrarModalCancelacion();
   actualizarPanelReserva();
   generarCalendario();
-  mostrarEstadoAgenda(
-    `Cancelaste el turno del ${reservaCancelada.fechaVisible} a las ${reservaCancelada.hora} hs. El horario volvió a quedar disponible.`,
-    "exito",
-  );
+  mostrarEstadoAgenda(`Cancelaste el turno del ${cancelada.fechaVisible} a las ${cancelada.hora} hs.`, "exito");
   estadoAgenda.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
-// -- Si el formulario tiene errores, mostrar el cartel rojo --
-formularioTurno.addEventListener(
-  "invalid",
-  () => {
-    mostrarErrorFormulario(
-      "Revisá los campos marcados antes de solicitar el turno.",
-    );
-  },
-  true,
-);
+formularioTurno.addEventListener("invalid", () => {
+  mostrarErrorFormulario("Revisá los campos marcados antes de solicitar el turno.");
+}, true);
 
-// -- Cuando apretás "QUIERO MI TURNO": validar y guardar (local + nube) --
+const MENSAJES_RPC = {
+  SLOT_OCUPADO: "Ese horario se acaba de ocupar desde otro celu. Elegí otro turno.",
+  TOPE_POR_TELEFONO: "Ya tenés 3 turnos activos con ese teléfono. Cancelá uno antes.",
+  DOMINGO_CERRADO: "Los domingos estamos cerrados. Elegí otro día.",
+  FECHA_PASADA: "Ese horario ya pasó. Elegí otro turno.",
+  SLOT_NO_HABILITADO: "Ese horario no está habilitado. Elegí otro turno.",
+  FUERA_DE_VENTANA: "Solo mostramos los próximos días abiertos.",
+  PAYLOAD_INVALIDO: "Ingresá tu nombre y apellido, y un celular uruguayo que comience con 09.",
+  IDEMPOTENCY_KEY_REUSED: "Ese pedido ya se procesó. Revisá tu turno arriba.",
+  TOKEN_INVALIDO_O_ESTADO_FINAL: "Tu turno cambió de estado. Recargá la página.",
+  SIN_NUBE: "Sin conexión a la nube: revisá js/supabase-client.js.",
+};
+
+// Crear o cambiar: UNA sola RPC atómica. Reintentar SOLO con mismos ids
+// (request_id/token ya generados) porque la operación es idempotente.
 formularioTurno.addEventListener("submit", async (evento) => {
   evento.preventDefault();
-
-  // Candado: si ya estamos enviando, ignoramos el segundo clic.
-  if (enviandoFormulario) {
-    return;
-  }
-
+  if (enviandoFormulario) return;
   ocultarErrorFormulario();
 
-  // Verificamos que el turno tocado siga siendo el mismo y siga libre.
-  // Si alguien lo ocupó mientras llenabas el formulario, te avisamos.
-  if (
-    !turnoSeleccionado ||
-    !campoFecha.value ||
-    !campoHora.value ||
-    campoFecha.value !== turnoSeleccionado.fecha ||
-    campoHora.value !== turnoSeleccionado.hora ||
-    turnosReservados.has(turnoSeleccionado.id)
-  ) {
-    mostrarEstadoAgenda(
-      "Ese horario ya no está disponible. Elegí otro turno.",
-      "error",
-    );
+  if (!turnoSeleccionado || !campoFecha.value || !campoHora.value ||
+      campoFecha.value !== turnoSeleccionado.fecha || campoHora.value !== turnoSeleccionado.hora ||
+      ocupados.has(turnoSeleccionado.llave)) {
+    mostrarEstadoAgenda("Ese horario ya no está disponible. Elegí otro turno.", "error");
     cerrarFormularioTurno();
     generarCalendario();
     calendario.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
-  // Revisamos nombre y teléfono con el "portero" de validacion.js.
   const formularioValido =
-    globalThis.ValidacionReserva?.validarFormulario(formularioTurno) ??
-    formularioTurno.checkValidity();
-
+    globalThis.ValidacionReserva?.validarFormulario(formularioTurno) ?? formularioTurno.checkValidity();
   if (!formularioValido) {
-    mostrarErrorFormulario(
-      "Ingresá un nombre válido y un celular uruguayo que comience con 09.",
-    );
+    mostrarErrorFormulario("Ingresá tu nombre y apellido, y un celular uruguayo que comience con 09.");
     formularioTurno.reportValidity();
     formularioTurno.querySelector(":invalid")?.focus();
     return;
   }
 
-  // Apagamos el botón y mostramos que estamos trabajando (para lectores de pantalla).
   enviandoFormulario = true;
   botonEnviar.disabled = true;
   botonEnviar.setAttribute("aria-busy", "true");
 
-  // Juntamos todos los datos del turno confirmado.
-  const datosTurno = Object.fromEntries(new FormData(formularioTurno));
-  const reservaAnterior = reservaActiva ? { ...reservaActiva } : null;
-  const esCambio = Boolean(reservaAnterior && modoReprogramacion);
-  const reservaConfirmada = {
-    ...turnoSeleccionado,
-    nombre: campoNombre.value,
-    telefono: campoTelefono.value,
-  };
+  const esCambio = Boolean(miTurno && modoReprogramacion);
+  const anterior = miTurno ? { ...miTurno } : null;
+  // Secretos generados ANTES de llamar: si la respuesta se pierde,
+  // reintentamos con los mismos (idempotente) y nada se duplica.
+  const reqId = crypto.randomUUID();
+  const tok = crypto.randomUUID();
 
-  // -- Guardar en la nube primero (si hay Supabase) --
-  // Si otro ya ocupó ese id, Supabase devuelve error 23505 = duplicado.
-  const cliente = nube();
-  if (cliente) {
-    // El horario viejo no se borra: queda como cancelado para el historial.
-    if (esCambio && reservaAnterior?.id !== reservaConfirmada.id) {
-      await cliente.from("reservas").update({ estado: "cancelado" }).eq("id", reservaAnterior.id);
-    }
-    const { error } = await cliente.from("reservas").insert({
-      id: reservaConfirmada.id,
-      fecha: reservaConfirmada.fecha,
-      hora: reservaConfirmada.hora,
-      nombre: reservaConfirmada.nombre.trim(),
-      telefono: reservaConfirmada.telefono,
-      estado: "pendiente",
-    });
-    if (error) {
-      restablecerBotonEnviar();
-      const ocupado = error.code === "23505" || /duplicate|ya existe/i.test(error.message || "");
-      mostrarEstadoAgenda(
-        ocupado
-          ? "Ese horario se acaba de ocupar desde otro celu. Elegí otro turno."
-          : "No pude guardar en la nube. Revisá tu conexión e intentá de nuevo.",
-        "error",
-      );
-      await sincronizarNube();
-      generarCalendario();
-      return;
-    }
-  }
-
-  // Si es un cambio, liberamos el horario viejo y ocupamos el nuevo (local).
+  let fila = null;
+  let codigoError = null;
   if (esCambio) {
-    turnosReservados.delete(reservaAnterior.id);
+    ({ fila, codigoError } = await llamarRpc("cambiar_con_token", {
+      p_id: anterior.id,
+      p_token: anterior.token,
+      p_nueva_fecha: turnoSeleccionado.fecha,
+      p_nueva_hora: turnoSeleccionado.hora,
+      p_request_id: reqId,
+      p_new_cancel_token: tok,
+    }));
+  } else {
+    ({ fila, codigoError } = await llamarRpc("crear_reserva", {
+      p_fecha: turnoSeleccionado.fecha,
+      p_hora: turnoSeleccionado.hora,
+      p_nombre: campoNombre.value.trim(),
+      p_telefono: campoTelefono.value,
+      p_request_id: reqId,
+      p_cancel_token: tok,
+    }));
   }
-  turnosReservados.add(reservaConfirmada.id);
-  almacenReservas?.guardar(reservaConfirmada);
-  reservaActiva = reservaConfirmada;
-  modoReprogramacion = false;
 
-  // Avisamos al resto de la página que algo pasó (por si quieren reaccionar).
-  document.dispatchEvent(
-    new CustomEvent(esCambio ? "turno:cambiado" : "turno:solicitado", {
-      detail: datosTurno,
-    }),
-  );
+  if (codigoError || !fila) {
+    restablecerBotonEnviar();
+    // Si el código no está en el mapa, mostrarlo igual: así se puede diagnosticar.
+    mostrarEstadoAgenda(
+      MENSAJES_RPC[codigoError] ?? `No pude guardar (${codigoError}). Revisá tu conexión e intentá de nuevo.`,
+      "error",
+    );
+    ocupados.clear();
+    await cargarDisponibilidad();
+    generarCalendario();
+    return;
+  }
+
+  guardarMiTurno({
+    id: fila.o_id,
+    token: tok,
+    fecha: fila.o_fecha,
+    hora: fila.o_hora,
+    fechaVisible: turnoSeleccionado.fechaVisible,
+    nombre: campoNombre.value.trim(),
+    telefono: campoTelefono.value,
+  });
+  modoReprogramacion = false;
+  document.dispatchEvent(new CustomEvent(esCambio ? "turno:cambiado" : "turno:solicitado", { detail: { id: fila.o_id } }));
 
   try {
     sessionStorage.removeItem("streetBarberPrefill");
-  } catch {
-    // La reserva temporal sigue funcionando aunque sessionStorage esté bloqueado.
-  }
-
-  // Limpiamos todo y volvemos a dibujar la cartelera con el nuevo estado.
+  } catch { /* igual */ }
   datosIniciales.nombre = "";
   datosIniciales.telefono = "";
   formularioTurno.reset();
@@ -713,22 +503,20 @@ formularioTurno.addEventListener("submit", async (evento) => {
   horarioSeleccionado = null;
   turnoSeleccionado = null;
   actualizarPanelReserva();
+  ocupados.clear();
+  await cargarDisponibilidad();
   generarCalendario();
 
-  // Mostramos el cartel verde de "¡listo!" con los detalles.
-  tituloConfirmacion.textContent = esCambio
-    ? "¡Turno cambiado!"
-    : "¡Turno solicitado!";
+  tituloConfirmacion.textContent = esCambio ? "¡Turno cambiado!" : "¡Turno solicitado!";
   mensajeConfirmacion.textContent = esCambio
-    ? `Tu nuevo turno es el ${reservaConfirmada.fechaVisible} a las ${reservaConfirmada.hora} hs. El horario anterior quedó liberado.`
-    : `Solicitaste el ${reservaConfirmada.fechaVisible} a las ${reservaConfirmada.hora} hs. Te contactaremos para confirmar.`;
+    ? `Tu nuevo turno es el ${miTurno.fechaVisible} a las ${miTurno.hora} hs. El anterior quedó cancelado en el historial.`
+    : `Solicitaste el ${miTurno.fechaVisible} a las ${miTurno.hora} hs. Te contactaremos para confirmar.`;
   mostrarEstadoAgenda(
     esCambio
-      ? `Cambiaste tu turno al ${reservaConfirmada.fechaVisible} a las ${reservaConfirmada.hora} hs.`
-      : `El horario ${reservaConfirmada.hora} del ${reservaConfirmada.fechaVisible} quedó reservado.`,
+      ? `Cambiaste tu turno al ${miTurno.fechaVisible} a las ${miTurno.hora} hs.`
+      : `El horario ${miTurno.hora} del ${miTurno.fechaVisible} quedó reservado.`,
     "exito",
   );
-
   formularioTurno.hidden = true;
   confirmacionTurno.hidden = false;
   confirmacionTurno.querySelector("h2").focus();

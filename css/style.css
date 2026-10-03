@@ -14,6 +14,10 @@
 @import "./basics/header&footer.css";
 
 /* Después lo específico de cada página. */
-@import "./pages/home.css";
+/* OJO el orden: agenda-modales va justo después de agenda. */
+@import "./pages/home-hero.css";
+@import "./pages/home-secciones.css";
+@import "./pages/home-contacto.css";
 @import "./pages/agenda.css";
+@import "./pages/agenda-modales.css";
 @import "./pages/dashboard.css";

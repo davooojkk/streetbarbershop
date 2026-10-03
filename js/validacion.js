@@ -2,7 +2,8 @@
 // VALIDACIÓN: el "portero" que revisa nombre y celular
 // ------------------------------------------------------------
 // Antes de aceptar una reserva, revisamos que los datos tengan sentido:
-// - Nombre: solo letras, de 2 a 60 letras. Acepta tildes y ñ.
+// - Nombre y apellido obligatorios: dos palabras o más, solo letras,
+//   total 2 a 60 letras. Acepta tildes y ñ. Ej: "Juan Pérez".
 // - Celular: uruguayo, 9 números, que empiece con 09. Ej: 091234567.
 // Si algo está mal, mostramos un mensaje amable y no dejamos avanzar.
 // ============================================================
@@ -12,10 +13,11 @@
 // Se lee así: /^09[0-9]{7}$/ = "empieza con 09 y después 7 números más".
 const patronTelefonoUruguayo = /^09[0-9]{7}$/;
 
-// -- El molde del nombre --
-// Se lee así: "empieza con una letra, después letras, espacios, ' o -".
-// La "u" del final permite tildes y ñ. {1,59} = entre 1 y 59 más (total 2 a 60).
-const patronNombrePersona = /^[\p{L}][\p{L}\s'-]{1,59}$/u;
+// -- El molde del nombre y apellido (OBLIGATORIO los dos) --
+// Se lee así: "palabra, espacio, palabra (y las que sigan)".
+// Cada palabra empieza con letra y sigue con letras, ' o -.
+// La "u" del final permite tildes y ñ. El largo 2-60 se revisa aparte.
+const patronNombrePersona = /^[\p{L}][\p{L}'-]*(\s+[\p{L}][\p{L}'-]*)+$/u;
 
 // -- Limpiar el nombre --
 // Saca espacios del inicio/fin y convierte espacios dobles en uno solo.
@@ -30,9 +32,10 @@ function normalizarNombre(valor) {
 // Devuelve true si está bien, false si está mal.
 function validarNombre(campo) {
   const nombre = normalizarNombre(campo.value);
+  const largoOk = nombre.length >= 2 && nombre.length <= 60;
   const mensaje =
-    campo.value && !patronNombrePersona.test(nombre)
-      ? "Ingresá un nombre válido de entre 2 y 60 caracteres."
+    campo.value && !(largoOk && patronNombrePersona.test(nombre))
+      ? "Ingresá tu nombre y apellido (dos palabras, solo letras)."
       : "";
 
   campo.setCustomValidity(mensaje);

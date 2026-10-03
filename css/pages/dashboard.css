@@ -199,23 +199,46 @@
   text-overflow: ellipsis; /* si no entra, pone "..." en vez de romper */
 }
 
-/* Teléfono + WhatsApp en una línea que se parte limpio si no entra. */
+/* Teléfono normal + botón verde de WhatsApp, en una línea limpia. */
 .turno__contacto {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem 0.6rem;
-  font-size: 0.85rem;
+  gap: 0.4rem 0.6rem;
+  margin-top: 0.3rem;
 }
 
-.turno__contacto a {
-  color: var(--agenda-accent-text, #9b3f00);
-  font-weight: 700;
+.turno__tel {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   overflow-wrap: anywhere;
+  text-decoration: none;
 }
 
-.turno__contacto .turno__sep {
-  color: var(--gris4);
+.turno__tel:hover {
+  color: var(--agenda-accent-text, #9b3f00);
+  text-decoration: underline;
+}
+
+.turno__wa {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #1faa53;
+  color: #fff !important;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.turno__wa:hover {
+  background: #178a43;
+  transform: translateY(-1px);
 }
 
 /* Etiqueta de estado: pendiente naranja, confirmado azul, atendido verde, cancelado rojo. */

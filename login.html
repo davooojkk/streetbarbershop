@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es-uy">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Squada+One&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <title>Entrar | Street Barbershop</title>
+  </head>
+  <body class="agenda-page">
+    <main class="dashboard" style="min-height: 100vh; display: grid; place-items: center">
+      <section class="dashboard-panel" style="width: min(100%, 26rem)" aria-labelledby="login-titulo">
+        <p class="section-eyebrow">STREET BARBERSHOP</p>
+        <h2 id="login-titulo" style="font-family: var(--display-font); font-size: 2.6rem; font-weight: 400; margin: 0.4rem 0 0.6rem">
+          Entrar al panel
+        </h2>
+        <p style="color: var(--gris5); font-size: 0.85rem; margin-bottom: 1.2rem">
+          Solo el barbero. Usá tu email y contraseña.
+        </p>
+        <form id="login-form" style="display: grid; gap: 0.9rem">
+          <label style="display: grid; gap: 0.35rem; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.06em">
+            EMAIL
+            <input
+              type="email"
+              id="login-email"
+              required
+              autocomplete="username"
+              style="min-height: 3rem; padding: 0 0.8rem; border: 1px solid #d8d2cb"
+            />
+          </label>
+          <label style="display: grid; gap: 0.35rem; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.06em">
+            CONTRASEÑA
+            <input
+              type="password"
+              id="login-pass"
+              required
+              autocomplete="current-password"
+              style="min-height: 3rem; padding: 0 0.8rem; border: 1px solid #d8d2cb"
+            />
+          </label>
+          <p id="login-error" role="alert" hidden style="border-left: 4px solid #b42318; background: #fff; padding: 0.7rem 0.9rem; font-size: 0.8rem; font-weight: 700"></p>
+          <button type="submit" style="min-height: 3.2rem; background: var(--ink); color: #fff; font-weight: 900; letter-spacing: 0.06em">
+            ENTRAR →
+          </button>
+          <a href="index.html" style="text-align: center; color: var(--gris5); font-size: 0.8rem">← Volver a la web</a>
+        </form>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js"></script>
+    <script>
+      document.querySelector("#login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const error = document.querySelector("#login-error");
+        error.hidden = true;
+        if (!globalThis.supabaseBarberia || !window.supabase) {
+          error.textContent = "No pude conectar con la nube. Revisá tu conexión.";
+          error.hidden = false;
+          return;
+        }
+        const { error: err } = await globalThis.supabaseBarberia.auth.signInWithPassword({
+          email: document.querySelector("#login-email").value.trim(),
+          password: document.querySelector("#login-pass").value,
+        });
+        if (err) {
+          error.textContent = "No pude entrar. Revisá email y contraseña.";
+          error.hidden = false;
+          return;
+        }
+        window.location.assign("dashboard.html");
+      });
+    </script>
+  </body>
+</html>

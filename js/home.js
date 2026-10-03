@@ -14,37 +14,27 @@
 const formularioContacto = document.querySelector(".appointment-form");
 const tarjetaReserva = document.querySelector("[data-booking-card]");
 
-// -- Dibujar la tarjetita con la info correcta (local + nube si hay) --
+// -- Dibujar la tarjetita: mi turno local o próximo libre según la nube --
+// La nube es la autoridad (RPC hora+ocupado, sin PII). Se prueban días
+// en orden hasta hallar hueco (normalmente 1-3 llamadas).
 async function actualizarTarjetaReserva() {
   // Si no hay tarjeta o no se cargó la cajita de fechas, no hacemos nada.
   if (!tarjetaReserva || !globalThis.CalendarioFechas) {
     return;
   }
 
-  // Pedimos prestadas las herramientas de fechas que ya explicamos en otro archivo.
   const {
     crearFechaDesdeValor,
     diasSemana,
     formatearFechaLarga,
-    obtenerProximoTurnoDisponible,
     turnoYaPaso,
   } = globalThis.CalendarioFechas;
 
-  // Preguntamos: ¿hay turnos ocupados? ¿guardé un turno antes?
-  const almacenReservas = globalThis.ReservasTemporales;
-  const turnosOcupados = almacenReservas?.obtenerIds() ?? new Set();
-  // Sumamos los ocupados de la nube (otros celus) para no prometer un turno tomado.
+  // Mi turno (si pedí uno en este celu y sigue vigente).
+  let ultimaReserva = null;
   try {
-    const nube = globalThis.supabaseBarberia;
-    const urlOk = nube && !(nube.supabaseUrl || "").includes("PEGÁ-ACÁ");
-    if (nube && urlOk) {
-      const hoy = new Date();
-      const hoyTexto = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
-      const { data } = await nube.from("reservas").select("id").gte("fecha", hoyTexto).neq("estado", "cancelado").limit(1000);
-      (data || []).forEach((r) => turnosOcupados.add(r.id));
-    }
-  } catch { /* sin nube seguimos con lo local */ }
-  const ultimaReserva = almacenReservas?.obtenerUltimaReserva();
+    ultimaReserva = JSON.parse(localStorage.getItem("streetBarberMiTurno") ?? "null");
+  } catch { /* sin storage no hay turno propio */ }
 
   // Convertimos la fecha guardada (texto) en fecha de verdad para poder comparar.
   const fechaReservada = ultimaReserva
@@ -83,11 +73,8 @@ async function actualizarTarjetaReserva() {
     return;
   }
 
-  // CASO 2: no tengo turno → buscar el próximo horario libre.
-  const proximoTurno = obtenerProximoTurnoDisponible(
-    new Date(),
-    turnosOcupados,
-  );
+  // CASO 2: no tengo turno → preguntar a la nube día por día.
+  const proximoTurno = await buscarProximoLibre();
 
   // Volvemos la tarjeta a su estado normal ("AGENDATE YA").
   tarjetaReserva.classList.remove("booking-card--reserved");
@@ -115,8 +102,41 @@ async function actualizarTarjetaReserva() {
   );
 }
 
+// Recorre los próximos 60 días abiertos y devuelve el primer hueco
+// (hora no ocupada según la RPC y no pasada si es hoy). Null si no hay.
+async function buscarProximoLibre() {
+  const cliente = globalThis.supabaseBarberia;
+  if (!cliente || !window.supabase) return null;
+  const ahora = new Date();
+  const dias = globalThis.CalendarioFechas.obtenerProximosDiasAbiertos(ahora, 60);
+  for (const d of dias) {
+    const valor = globalThis.CalendarioFechas.formatearFechaValor(d);
+    let filas = null;
+    try {
+      const res = await cliente.rpc("obtener_disponibilidad", { dia: valor });
+      if (res.error || !res.data) continue;
+      filas = res.data;
+    } catch {
+      continue;
+    }
+    for (const h of filas) {
+      if (!h.ocupado && !globalThis.CalendarioFechas.horarioYaPaso(d, h.hora, ahora)) {
+        return { fecha: d, fechaValor: valor, hora: h.hora };
+      }
+    }
+  }
+  return null;
+}
+
 // Al abrir la página, dibujamos la tarjeta enseguida.
-actualizarTarjetaReserva();
+// El catch es red de seguridad: si algo raro pasa, mostramos CONSULTANOS
+// en vez de dejar la promesa rota en silencio.
+actualizarTarjetaReserva().catch(() => {
+  const dia = tarjetaReserva?.querySelector("[data-booking-day]");
+  const hora = tarjetaReserva?.querySelector("[data-booking-time]");
+  if (dia) dia.textContent = "CONSULTANOS";
+  if (hora) hora.textContent = "—";
+});
 
 // -- Cuando enviás el formulario de "Quiero ser cliente" --
 formularioContacto?.addEventListener("submit", (evento) => {

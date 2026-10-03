@@ -1,0 +1,290 @@
+/* ============================================================
+   HOME HERO: la portada de index.html (foto + título + tarjeta)
+   ------------------------------------------------------------
+   Primera parte de la home (las otras dos son
+   "home-secciones.css" y "home-contacto.css").
+   - ".hero" = la portada grande con foto de fondo.
+   - ".booking-card" = la tarjetita blanca para reservar.
+     Si ya tenés turno, se vuelve verde (ver --reserved).
+   ============================================================ */
+
+/* -- HERO: cuadrícula de 2 columnas (texto + tarjeta) -- */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.48fr);
+  align-items: center;
+  gap: clamp(2rem, 8vw, 7rem);
+  min-height: clamp(31rem, 63vw, 45rem);
+  padding: clamp(4.5rem, 9vw, 8rem) max(var(--page-pad), calc((100vw - var(--page-max)) / 2));
+  background: #080808;
+}
+
+/* La foto de fondo: ocupa todo el hero, queda detrás del texto (z-index negativo). */
+.hero__background {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Velo oscuro sobre la foto para que el texto blanco se lea bien. */
+.hero::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 8, 8, 0.88) 0%, rgba(8, 8, 8, 0.48) 55%, rgba(8, 8, 8, 0.7) 100%);
+  content: "";
+}
+
+.hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(14, 14, 14, 0.55), transparent 45%);
+  content: "";
+}
+
+/* El texto de la izquierda: frase chiquita + título gigante. */
+.hero__content {
+  max-width: 43rem;
+}
+
+.hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  color: var(--gris2, #a6a6a6);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hero__eyebrow::before {
+  width: 2.5rem;
+  height: 3px;
+  background: var(--accent);
+  content: "";
+}
+
+.hero__title {
+  color: #fff;
+  font-size: clamp(3.5rem, 7.4vw, 6.75rem);
+  font-weight: 900;
+  line-height: 0.87;
+  letter-spacing: -0.075em;
+  text-wrap: balance;
+}
+
+.hero__title strong {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
+/* -- BOOKING-CARD: la tarjetita blanca "Reservá tu cita" -- */
+/* Borde naranja + sombra dura. Si ya tenés turno, se vuelve verde (ver --reserved). */
+.booking-card {
+  justify-self: end;
+  width: min(100%, 23rem);
+  padding: clamp(1.4rem, 3vw, 2.1rem);
+  border: 3px solid var(--accent);
+  background: rgba(247, 247, 247, 0.97);
+  box-shadow: 14px 14px 0 rgba(251, 121, 4, 0.22);
+  color: var(--ink);
+}
+
+.booking-card__eyebrow {
+  margin-bottom: 0.15rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.booking-card h2 {
+  margin-bottom: 1.3rem;
+  font-family: var(--display-font);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.booking-card__label {
+  margin-bottom: 0.35rem;
+  color: var(--gris5, #555);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* La fecha del próximo turno: día a la izquierda, hora naranja a la derecha. */
+.booking-card__date {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid #cfcfcf;
+  border-bottom: 1px solid #cfcfcf;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.booking-card__date strong {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+/* El botón negro "Reservar ahora": al pasar el mouse se vuelve naranja y sube 2px. */
+.booking-card__button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 3rem;
+  padding: 0 1rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.booking-card__button:hover,
+.booking-card__button:focus-visible {
+  background: var(--accent);
+  transform: translateY(-2px);
+}
+
+.booking-card__button-arrow {
+  font-size: 1.25rem;
+}
+
+.booking-card__button-label {
+  font-size: inherit;
+}
+
+/* Cuando ya pediste un turno, la tarjeta se pinta de verde para festejar. */
+.booking-card--reserved {
+  border-color: #2d7a46;
+  box-shadow: 14px 14px 0 rgba(45, 122, 70, 0.2);
+}
+
+.booking-card--reserved .booking-card__eyebrow,
+.booking-card--reserved .booking-card__date strong {
+  color: #236238;
+}
+
+.booking-card--reserved .booking-card__label {
+  color: var(--gris6);
+}
+
+/* -- PANTALLAS MEDIANAS (tablet): hero en 1 columna -- */
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+
+  .hero__content {
+    max-width: 48rem;
+  }
+
+  .booking-card {
+    justify-self: start;
+    width: min(100%, 26rem);
+  }
+}
+
+/* -- CELULAR: hero más bajo, título más chico -- */
+@media (max-width: 760px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 2.3rem;
+    min-height: 35rem;
+    padding-block: 4rem;
+  }
+
+  .hero__background {
+    object-position: 52% center;
+  }
+
+  .hero__eyebrow {
+    font-size: 0.62rem;
+  }
+
+  .hero__title {
+    max-width: 9ch;
+    font-size: clamp(3.35rem, 15vw, 5.1rem);
+  }
+
+  .booking-card {
+    justify-self: stretch;
+    width: min(100%, 22rem);
+    box-shadow: 8px 8px 0 rgba(251, 121, 4, 0.22);
+  }
+}
+
+/* -- CELULAR CHIQUITO: escondemos la frase chica, todo más compacto -- */
+@media (max-width: 420px) {
+  .hero {
+    gap: 1.75rem;
+    min-height: 31rem;
+    padding-block: 3rem;
+  }
+
+  .hero__eyebrow {
+    display: none;
+  }
+
+  .hero__title {
+    font-size: clamp(2.8rem, 15vw, 3.75rem);
+  }
+
+  .booking-card {
+    justify-self: stretch;
+    width: 100%;
+    padding: 1.25rem;
+  }
+
+  .booking-card h2 {
+    margin-bottom: 0.75rem;
+    font-size: 1.75rem;
+  }
+
+  .booking-card__label,
+  .booking-card__date,
+  .booking-card__button {
+    font-size: 0.58rem;
+  }
+
+  .booking-card__date {
+    margin-bottom: 0.7rem;
+    padding-block: 0.4rem;
+  }
+
+  .booking-card__button {
+    min-height: 2.8rem;
+  }
+}
+
+/* -- CELULAR MINI: título y fecha más chicos para que entren -- */
+@media (max-width: 340px) {
+  .hero__title {
+    font-size: 2.6rem;
+  }
+
+  .booking-card__date {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
