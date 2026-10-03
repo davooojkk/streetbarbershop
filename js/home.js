@@ -14,8 +14,8 @@
 const formularioContacto = document.querySelector(".appointment-form");
 const tarjetaReserva = document.querySelector("[data-booking-card]");
 
-// -- Dibujar la tarjetita con la info correcta --
-function actualizarTarjetaReserva() {
+// -- Dibujar la tarjetita con la info correcta (local + nube si hay) --
+async function actualizarTarjetaReserva() {
   // Si no hay tarjeta o no se cargó la cajita de fechas, no hacemos nada.
   if (!tarjetaReserva || !globalThis.CalendarioFechas) {
     return;
@@ -33,6 +33,17 @@ function actualizarTarjetaReserva() {
   // Preguntamos: ¿hay turnos ocupados? ¿guardé un turno antes?
   const almacenReservas = globalThis.ReservasTemporales;
   const turnosOcupados = almacenReservas?.obtenerIds() ?? new Set();
+  // Sumamos los ocupados de la nube (otros celus) para no prometer un turno tomado.
+  try {
+    const nube = globalThis.supabaseBarberia;
+    const urlOk = nube && !(nube.supabaseUrl || "").includes("PEGÁ-ACÁ");
+    if (nube && urlOk) {
+      const hoy = new Date();
+      const hoyTexto = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+      const { data } = await nube.from("reservas").select("id").gte("fecha", hoyTexto).neq("estado", "cancelado").limit(1000);
+      (data || []).forEach((r) => turnosOcupados.add(r.id));
+    }
+  } catch { /* sin nube seguimos con lo local */ }
   const ultimaReserva = almacenReservas?.obtenerUltimaReserva();
 
   // Convertimos la fecha guardada (texto) en fecha de verdad para poder comparar.

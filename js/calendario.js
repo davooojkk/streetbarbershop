@@ -404,9 +404,45 @@ function generarCalendario(ahora = new Date()) {
   });
 }
 
-// -- Arranque: al abrir la página dibujamos todo una vez --
+// -- Hablar con Supabase si está configurado (sin romper lo local) --
+// Devuelve el cliente o null si todavía no pegaste URL/KEY.
+function nube() {
+  const c = globalThis.supabaseBarberia;
+  if (!c) return null;
+  // Si dejaste el texto "PEGÁ-ACÁ", es como no tener nada.
+  try {
+    const url = c.supabaseUrl || "";
+    if (url.includes("PEGÁ-ACÁ")) return null;
+  } catch { /* seguimos igual */ }
+  return c;
+}
+
+// -- Traer ocupados de la nube para los 5 días y mezclarlos con los locales --
+// Así si otro celu reservó, a vos también te aparece ocupado.
+async function sincronizarNube() {
+  try {
+    const cliente = nube();
+    if (!cliente) return;
+    const dias = obtenerProximosDiasAbiertos(new Date(), 5).map(formatearFechaValor);
+    const desde = dias[0];
+    const hasta = dias[dias.length - 1];
+    const { data, error } = await cliente
+      .from("reservas")
+      .select("id")
+      .gte("fecha", desde)
+      .lte("fecha", hasta)
+      .neq("estado", "cancelado");
+    if (error || !data) return;
+    data.forEach((r) => turnosReservados.add(r.id));
+  } catch {
+    // Sin internet o sin keys seguimos con lo local, la página no se rompe.
+  }
+}
+
+// -- Arranque: dibujamos enseguida lo local y después sumamos la nube --
 actualizarPanelReserva();
 generarCalendario();
+sincronizarNube().then(() => generarCalendario());
 
 // -- Botones "X" para cerrar la ventanita --
 document.querySelectorAll("[data-close-modal]").forEach((boton) => {
@@ -507,14 +543,20 @@ modalCancelacion.addEventListener("close", () => {
   }
 });
 
-// -- Botón rojo "SÍ, CANCELAR": borrar mi turno de verdad --
-botonConfirmarCancelacion?.addEventListener("click", () => {
+// -- Botón rojo "SÍ, CANCELAR": borrar mi turno de verdad (local + nube) --
+botonConfirmarCancelacion?.addEventListener("click", async () => {
   if (!reservaActiva) {
     cerrarModalCancelacion();
     return;
   }
 
   const reservaCancelada = { ...reservaActiva };
+
+  // Guardamos en la nube como "cancelado" (NO borramos: queda historial).
+  // Así el dashboard puede contar quién cancela más.
+  try {
+    await nube()?.from("reservas").update({ estado: "cancelado" }).eq("id", reservaCancelada.id);
+  } catch { /* seguimos con lo local */ }
 
   if (!almacenReservas?.cancelar(reservaCancelada.id)) {
     mostrarEstadoAgenda(
@@ -549,8 +591,8 @@ formularioTurno.addEventListener(
   true,
 );
 
-// -- Cuando apretás "QUIERO MI TURNO": validar y guardar --
-formularioTurno.addEventListener("submit", (evento) => {
+// -- Cuando apretás "QUIERO MI TURNO": validar y guardar (local + nube) --
+formularioTurno.addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
   // Candado: si ya estamos enviando, ignoramos el segundo clic.
@@ -609,7 +651,38 @@ formularioTurno.addEventListener("submit", (evento) => {
     telefono: campoTelefono.value,
   };
 
-  // Si es un cambio, liberamos el horario viejo y ocupamos el nuevo.
+  // -- Guardar en la nube primero (si hay Supabase) --
+  // Si otro ya ocupó ese id, Supabase devuelve error 23505 = duplicado.
+  const cliente = nube();
+  if (cliente) {
+    // El horario viejo no se borra: queda como cancelado para el historial.
+    if (esCambio && reservaAnterior?.id !== reservaConfirmada.id) {
+      await cliente.from("reservas").update({ estado: "cancelado" }).eq("id", reservaAnterior.id);
+    }
+    const { error } = await cliente.from("reservas").insert({
+      id: reservaConfirmada.id,
+      fecha: reservaConfirmada.fecha,
+      hora: reservaConfirmada.hora,
+      nombre: reservaConfirmada.nombre.trim(),
+      telefono: reservaConfirmada.telefono,
+      estado: "pendiente",
+    });
+    if (error) {
+      restablecerBotonEnviar();
+      const ocupado = error.code === "23505" || /duplicate|ya existe/i.test(error.message || "");
+      mostrarEstadoAgenda(
+        ocupado
+          ? "Ese horario se acaba de ocupar desde otro celu. Elegí otro turno."
+          : "No pude guardar en la nube. Revisá tu conexión e intentá de nuevo.",
+        "error",
+      );
+      await sincronizarNube();
+      generarCalendario();
+      return;
+    }
+  }
+
+  // Si es un cambio, liberamos el horario viejo y ocupamos el nuevo (local).
   if (esCambio) {
     turnosReservados.delete(reservaAnterior.id);
   }

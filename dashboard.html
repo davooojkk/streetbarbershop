@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es-uy">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Squada+One&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <title>Panel del barbero | Street Barbershop</title>
+  </head>
+  <body class="agenda-page">
+    <header class="site-header" id="inicio">
+      <nav class="site-nav" aria-label="Navegación principal">
+        <ul>
+          <li><a href="index.html#nosotros">NOSOTROS</a></li>
+          <li><a href="agenda.html">AGENDAR</a></li>
+          <li><a href="#redes">REDES</a></li>
+          <li><a href="index.html#servicios">SERVICIOS</a></li>
+        </ul>
+      </nav>
+
+      <a class="brand" href="index.html" aria-label="Street Barbershop, inicio">
+        Street<br />
+        Barbershop
+      </a>
+    </header>
+
+    <main class="dashboard">
+      <div class="dashboard-header">
+        <h1>Panel del<br /><span>barbero.</span></h1>
+        <p>Turnos del día a la izquierda. Números de la semana a la derecha.</p>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- IZQUIERDA: ocupa casi toda la pantalla. Lista del día elegido. -->
+        <section class="dashboard-panel dashboard-panel--dia" aria-labelledby="titulo-dia">
+          <h2 id="titulo-dia">Turnos del día</h2>
+
+          <div class="dashboard-day-controls">
+            <input type="date" id="dashboard-fecha" aria-label="Elegir día" />
+            <button type="button" id="dashboard-hoy">HOY</button>
+            <button type="button" id="dashboard-recargar">ACTUALIZAR</button>
+          </div>
+
+          <p
+            class="dashboard-status"
+            id="dashboard-status"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></p>
+
+          <div id="dashboard-lista" aria-live="polite"></div>
+        </section>
+
+        <!-- DERECHA: numeritos + semana. -->
+        <div class="dashboard-side">
+          <section class="dashboard-panel" aria-labelledby="titulo-numeros">
+            <h2 id="titulo-numeros">Números</h2>
+            <div class="stats">
+              <div class="stat stat--ocupacion">
+                <strong id="stat-hoy">—</strong>
+                <span>OCUPACIÓN HOY</span>
+                <em id="stat-hoy-pct">—</em>
+                <div class="stat__bar" aria-hidden="true"><i id="stat-hoy-bar"></i></div>
+              </div>
+              <div class="stat stat--alerta">
+                <strong id="stat-pendientes">—</strong>
+                <span>POR CONFIRMAR</span>
+                <em>te están esperando</em>
+              </div>
+              <div class="stat">
+                <strong id="stat-semana">—</strong>
+                <span>SEMANA</span>
+                <em id="stat-semana-top">—</em>
+              </div>
+              <div class="stat stat--peligro">
+                <strong id="stat-cancel">—</strong>
+                <span>CANCELADOS</span>
+                <em id="stat-cancel-pct">—</em>
+              </div>
+            </div>
+          </section>
+
+          <section class="dashboard-panel" aria-labelledby="titulo-semana">
+            <h2 id="titulo-semana">Semana</h2>
+            <p style="color: var(--gris5); font-size: 0.78rem; margin-top: 0.4rem">
+              Lunes a sábado. Sin contar cancelados.
+            </p>
+            <div class="semana" id="dashboard-semana"></div>
+          </section>
+
+          <section class="dashboard-panel" aria-labelledby="titulo-reincidentes">
+            <h2 id="titulo-reincidentes">Los que más cancelan</h2>
+            <p style="color: var(--gris5); font-size: 0.78rem; margin-top: 0.4rem">
+              Historial de cancelados. No se borra nada.
+            </p>
+            <div class="reincidentes" id="dashboard-reincidentes"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer" id="redes">
+      <div class="site-footer__main">
+        <div class="site-footer__brand">
+          <h2>STREET<br />BARBERSHOP</h2>
+
+          <p>
+            Cortes, estilo y atención personalizada. Tu próxima versión empieza acá.
+          </p>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>NAVEGACIÓN</h3>
+
+          <nav aria-label="Navegación del pie de página">
+            <ul>
+              <li><a href="index.html#nosotros">NOSOTROS</a></li>
+              <li><a href="agenda.html">AGENDAR</a></li>
+              <li><a href="index.html#servicios">SERVICIOS</a></li>
+              <li><a href="index.html#cortes">CORTES</a></li>
+              <li><a href="index.html#contacto">CONTACTO</a></li>
+            </ul>
+          </nav>
+        </div>
+
+        <div class="site-footer__column">
+          <h3>CONTACTO</h3>
+
+          <address>
+            <p>
+              <a href="tel:+000000000">+00 0000 0000</a>
+            </p>
+
+            <p>
+              <a href="mailto:contacto@streetbarbershop.com">
+                contacto@streetbarbershop.com
+              </a>
+            </p>
+
+            <p>Tu ciudad, tu dirección</p>
+          </address>
+        </div>
+
+        <div class="site-footer__column site-footer__social">
+          <h3>SEGUINOS</h3>
+
+          <ul>
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                INSTAGRAM <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                FACEBOOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+
+            <li>
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                TIKTOK <span aria-hidden="true">↗</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="site-footer__bottom">
+        <p>© 2026 Street Barbershop. Todos los derechos reservados.</p>
+
+        <a href="#inicio">VOLVER ARRIBA <span aria-hidden="true">↑</span></a>
+      </div>
+    </footer>
+
+    <!-- Cable a Supabase (tiene que ir ANTES de dashboard.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/dashboard.js"></script>
+  </body>
+</html>
