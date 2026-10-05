@@ -63,7 +63,8 @@
   position: absolute;
   top: -0.35rem;
   left: 0;
-  color: var(--accent);
+  /* El naranja principal no alcanza contraste sobre este fondo claro. */
+  color: #a94700;
   font-family: var(--display-font);
   font-size: clamp(2.6rem, 5vw, 4.25rem);
   line-height: 1;

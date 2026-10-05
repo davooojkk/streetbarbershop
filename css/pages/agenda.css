@@ -351,15 +351,26 @@ body.modal-open {
   text-decoration: none;
 }
 
+.horario.desconocido {
+  border-color: #d4cec7;
+  background: #edeae6;
+  color: var(--gris5);
+  opacity: 1;
+  text-decoration: none;
+}
+
 .horario.ocupado span,
 .horario.ocupado small,
 .horario.propio span,
-.horario.propio small {
+.horario.propio small,
+.horario.desconocido span,
+.horario.desconocido small {
   display: block;
 }
 
 .horario.ocupado small,
-.horario.propio small {
+.horario.propio small,
+.horario.desconocido small {
   margin-top: 0.12rem;
   color: var(--agenda-accent-text);
   font-size: 0.5rem;

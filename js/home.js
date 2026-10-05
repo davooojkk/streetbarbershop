@@ -14,6 +14,43 @@
 const formularioContacto = document.querySelector(".appointment-form");
 const tarjetaReserva = document.querySelector("[data-booking-card]");
 
+function normalizarHora(hora) {
+  const coincidencia = String(hora ?? "").match(/^([01][0-9]|2[0-3]):([0-5][0-9])/);
+  return coincidencia ? `${coincidencia[1]}:${coincidencia[2]}` : "";
+}
+
+async function reconciliarReservaLocal(reserva) {
+  if (!reserva?.id || !reserva?.token) return reserva;
+  const cliente = globalThis.supabaseBarberia;
+  if (!cliente || !window.supabase) return reserva;
+  try {
+    const { data, error } = await cliente.rpc("obtener_reserva_con_token", {
+      p_id: reserva.id,
+      p_token: reserva.token,
+    });
+    if (error) {
+      const detalle = `${error.message ?? ""} ${error.details ?? ""}`;
+      if (detalle.includes("TOKEN_INVALIDO") || detalle.includes("RESERVA_INEXISTENTE")) {
+        localStorage.removeItem("streetBarberMiTurno");
+        return null;
+      }
+      return reserva;
+    }
+    const fila = Array.isArray(data) ? data[0] : data;
+    const hora = normalizarHora(fila?.o_hora);
+    if (!fila || !["pendiente", "confirmado"].includes(fila.o_estado) || !hora) {
+      localStorage.removeItem("streetBarberMiTurno");
+      return null;
+    }
+    const actualizada = { ...reserva, fecha: fila.o_fecha, hora };
+    localStorage.setItem("streetBarberMiTurno", JSON.stringify(actualizada));
+    return actualizada;
+  } catch {
+    // Sin red conservamos el turno local: es más seguro que habilitar un duplicado.
+    return reserva;
+  }
+}
+
 // -- Dibujar la tarjetita: mi turno local o próximo libre según la nube --
 // La nube es la autoridad (RPC hora+ocupado, sin PII). Se prueban días
 // en orden hasta hallar hueco (normalmente 1-3 llamadas).
@@ -35,6 +72,10 @@ async function actualizarTarjetaReserva() {
   try {
     ultimaReserva = JSON.parse(localStorage.getItem("streetBarberMiTurno") ?? "null");
   } catch { /* sin storage no hay turno propio */ }
+  if (ultimaReserva) {
+    ultimaReserva.hora = normalizarHora(ultimaReserva.hora);
+    ultimaReserva = await reconciliarReservaLocal(ultimaReserva);
+  }
 
   // Convertimos la fecha guardada (texto) en fecha de verdad para poder comparar.
   const fechaReservada = ultimaReserva
@@ -109,19 +150,28 @@ async function buscarProximoLibre() {
   if (!cliente || !window.supabase) return null;
   const ahora = new Date();
   const dias = globalThis.CalendarioFechas.obtenerProximosDiasAbiertos(ahora, 60);
-  for (const d of dias) {
-    const valor = globalThis.CalendarioFechas.formatearFechaValor(d);
-    let filas = null;
+  // Se consulta en lotes pequeños: evita hasta 60 esperas consecutivas cuando
+  // la agenda está llena, sin disparar todas las peticiones a la vez.
+  for (let inicio = 0; inicio < dias.length; inicio += 5) {
+    const lote = dias.slice(inicio, inicio + 5);
+    let respuestas;
     try {
-      const res = await cliente.rpc("obtener_disponibilidad", { dia: valor });
-      if (res.error || !res.data) continue;
-      filas = res.data;
+      respuestas = await Promise.all(lote.map(async (d) => {
+        const fechaValor = globalThis.CalendarioFechas.formatearFechaValor(d);
+        const res = await cliente.rpc("obtener_disponibilidad", { dia: fechaValor });
+        if (res.error || !Array.isArray(res.data)) throw res.error ?? new Error("RESPUESTA_INVALIDA");
+        return { d, fechaValor, filas: res.data };
+      }));
     } catch {
-      continue;
+      // No se anuncia un horario posterior si hay días anteriores sin confirmar.
+      return null;
     }
-    for (const h of filas) {
-      if (!h.ocupado && !globalThis.CalendarioFechas.horarioYaPaso(d, h.hora, ahora)) {
-        return { fecha: d, fechaValor: valor, hora: h.hora };
+    for (const respuesta of respuestas) {
+      for (const h of respuesta.filas) {
+        const hora = normalizarHora(h.hora);
+        if (hora && !h.ocupado && !globalThis.CalendarioFechas.horarioYaPaso(respuesta.d, hora, ahora)) {
+          return { fecha: respuesta.d, fechaValor: respuesta.fechaValor, hora };
+        }
       }
     }
   }

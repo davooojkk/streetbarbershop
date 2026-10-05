@@ -12,8 +12,8 @@
 const SUPABASE_URL = "https://pwvnstcbmavyzzsjvjwi.supabase.co"; // ej: "https://abcd1234.supabase.co"
 const SUPABASE_ANON_KEY = "sb_publishable_PKjnPh4EuZW0JlIBm-EjEw_lMbexpnH"; // ej: "sb_publishable_..." o "eyJ..."
 
-// Creamos el cliente una sola vez y lo dejamos visible para toda la página.
-globalThis.supabaseBarberia = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-);
+// Si el CDN está caído, las páginas muestran su estado de error en vez de
+// romper toda la ejecución con "supabase is undefined".
+globalThis.supabaseBarberia = globalThis.supabase?.createClient
+  ? globalThis.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;

@@ -14,9 +14,14 @@
 
 create extension if not exists "pgcrypto";
 
--- Limpieza de la demo anterior (tabla vieja con id texto). SOLO demo:
--- si ya tuvieras clientes reales, MIGRAR, nunca dropear.
-drop table if exists public.reservas;
+-- Esta migración crea el modelo desde cero. Nunca borra una agenda existente:
+-- si ya hay una tabla reservas, se detiene para evitar pérdida de datos.
+do $$
+begin
+  if to_regclass('public.reservas') is not null then
+    raise exception 'MIGRACION_0001_REQUIERE_BASE_LIMPIA';
+  end if;
+end $$;
 
 -- Quién es barbero: allowlist explícita (no "cualquiera autenticado").
 create table if not exists public.barberos (
@@ -144,7 +149,7 @@ begin
       (slot_fecha, slot_hora, nombre, telefono, estado,
        cancel_token_hash, request_id, request_fp)
     values (p_fecha, p_hora, p_nombre, p_telefono, 'pendiente',
-            encode(digest(p_cancel_token::text, 'sha256'), 'hex'),
+            encode(extensions.digest(p_cancel_token::text, 'sha256'), 'hex'),
             p_request_id, v_fp)
     returning id, slot_fecha, slot_hora, estado
       into o_id, o_fecha, o_hora, o_estado;
@@ -166,7 +171,7 @@ returns void language plpgsql security definer set search_path = '' as $$
 begin
   update public.reservas r set estado = 'cancelado'
   where r.id = p_id
-    and r.cancel_token_hash = encode(digest(p_token::text, 'sha256'), 'hex')
+    and r.cancel_token_hash = encode(extensions.digest(p_token::text, 'sha256'), 'hex')
     and r.estado in ('pendiente','confirmado');
   if not found then
     raise exception 'TOKEN_INVALIDO_O_ESTADO_FINAL';
@@ -192,7 +197,7 @@ begin
   if not found then
     raise exception 'RESERVA_INEXISTENTE';
   end if;
-  if v_orig.cancel_token_hash <> encode(digest(p_token::text, 'sha256'), 'hex') then
+  if v_orig.cancel_token_hash <> encode(extensions.digest(p_token::text, 'sha256'), 'hex') then
     raise exception 'TOKEN_INVALIDO_O_ESTADO_FINAL';
   end if;
   if v_orig.estado not in ('pendiente','confirmado') then
@@ -210,7 +215,7 @@ begin
       (slot_fecha, slot_hora, nombre, telefono, estado,
        cancel_token_hash, request_id, request_fp)
     values (p_nueva_fecha, p_nueva_hora, v_orig.nombre, v_orig.telefono, 'pendiente',
-            encode(digest(p_new_cancel_token::text, 'sha256'), 'hex'),
+            encode(extensions.digest(p_new_cancel_token::text, 'sha256'), 'hex'),
             p_request_id, v_fp)
     returning id, slot_fecha, slot_hora, estado
       into o_id, o_fecha, o_hora, o_estado;

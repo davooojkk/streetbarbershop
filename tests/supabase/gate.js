@@ -1,5 +1,5 @@
 // ============================================================
-// GATE de merge: 7 grupos que rompen el build si la seguridad cae.
+// GATE de merge: 8 grupos que rompen el build si la seguridad cae.
 // Sin dependencias (fetch nativo). No commitear secretos: usa env.
 // Uso (PowerShell):
 //   $env:SUPABASE_URL="https://xxx.supabase.co"
@@ -101,6 +101,7 @@ async function limpiarPruebas() {
 }
 
 (async () => {
+  try {
   console.log("GATE 1: anónimo no toca la tabla directo");
   let r = await llamada("GET", "/rest/v1/reservas?select=id&limit=1");
   ok("anon SELECT denegado", r.status !== 200, `status=${r.status}`);
@@ -160,8 +161,10 @@ async function limpiarPruebas() {
   const i1 = await rpc("crear_reserva", { p_fecha: F, p_hora: "11:00", p_nombre: "Gate I", p_telefono: TEL(30), p_request_id: reqI, p_cancel_token: tokI });
   const f1 = filaDe(i1);
   if (f1) paraLimpiar.push({ id: f1.o_id, token: tokI });
-  const i2 = await rpc("crear_reserva", { p_fecha: F, p_hora: "11:00", p_nombre: "Gate I", p_telefono: TEL(30), p_request_id: reqI, p_cancel_token: nid() });
+  const i2 = await rpc("crear_reserva", { p_fecha: F, p_hora: "11:00", p_nombre: "Gate I", p_telefono: TEL(30), p_request_id: reqI, p_cancel_token: tokI });
   ok("mismo request_id + mismo payload = mismo resultado", i1.status === 200 && i2.status === 200 && JSON.stringify(i1.json) === JSON.stringify(i2.json));
+  const iToken = await rpc("crear_reserva", { p_fecha: F, p_hora: "11:00", p_nombre: "Gate I", p_telefono: TEL(30), p_request_id: reqI, p_cancel_token: nid() });
+  ok("mismo request_id + otro token se rechaza", iToken.status !== 200 && JSON.stringify(iToken.json).includes("IDEMPOTENCY_KEY_REUSED"));
   const i3 = await rpc("crear_reserva", { p_fecha: F, p_hora: "12:00", p_nombre: "Otro Dos", p_telefono: TEL(31), p_request_id: reqI, p_cancel_token: nid() });
   ok("mismo request_id + distinto payload = IDEMPOTENCY_KEY_REUSED", i3.status !== 200 && JSON.stringify(i3.json).includes("IDEMPOTENCY_KEY_REUSED"));
 
@@ -199,11 +202,13 @@ async function limpiarPruebas() {
     }
   }
 
-  await limpiarPruebas();
+  } finally {
+    await limpiarPruebas();
+  }
   console.log(`\nResultado: ${pasadas} ok, ${falladas} fallos.`);
   if (falladas > 0) {
     console.log(`Fallaron: ${fallos.join(" | ")}`);
-    process.exit(1);
+    process.exitCode = 1;
   }
 })().catch((e) => {
   console.error(`ERROR de red/ejecución: ${e.message}`);

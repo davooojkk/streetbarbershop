@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const {
   formatearFechaValor,
   horarioYaPaso,
+  crearFechaDesdeValor,
   obtenerIdTurno,
   obtenerProximoTurnoDisponible,
   obtenerProximosDiasAbiertos,
@@ -50,6 +51,10 @@ const hoy = new Date(2026, 8, 29);
 
 assert.equal(horarioYaPaso(hoy, "10:00", ahora), true);
 assert.equal(horarioYaPaso(hoy, "11:00", ahora), false);
+assert.equal(horarioYaPaso(hoy, "25:00", ahora), true);
+assert.equal(horarioYaPaso(hoy, "texto", ahora), true);
+assert.equal(crearFechaDesdeValor("2026-02-30"), null);
+assert.equal(crearFechaDesdeValor("no-es-fecha"), null);
 assert.equal(
   obtenerIdTurno(new Date(2027, 0, 1), "08:00"),
   "2027-01-01|08:00",

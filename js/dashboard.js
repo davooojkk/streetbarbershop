@@ -25,6 +25,19 @@ const statCancelPct = document.querySelector("#stat-cancel-pct");
 
 // Capacidad real: 10 turnos por día (08:00–17:00).
 const SLOTS_POR_DIA = 10;
+const TRANSICIONES = Object.freeze({
+  pendiente: ["confirmado", "cancelado"],
+  confirmado: ["atendido", "cancelado"],
+  atendido: [],
+  cancelado: [],
+});
+const cambiosEnCurso = new Set();
+let ultimaCarga = 0;
+
+function normalizarHora(hora) {
+  const coincidencia = String(hora ?? "").match(/^([01][0-9]|2[0-3]):([0-5][0-9])/);
+  return coincidencia ? `${coincidencia[1]}:${coincidencia[2]}` : String(hora ?? "");
+}
 
 function hoyValor() {
   const h = new Date();
@@ -74,11 +87,14 @@ function rangoPedido(fechaBase) {
 function crearTarjetaTurno(t) {
   const tarjeta = document.createElement("article");
   tarjeta.className = "turno";
+  tarjeta.dataset.reservaId = t.o_id;
+  tarjeta.dataset.estado = t.o_estado;
   if (t.o_estado === "cancelado") tarjeta.classList.add("turno--cancelado");
 
   const hora = document.createElement("div");
   hora.className = "turno__hora";
-  hora.textContent = t.o_hora;
+  const horaVisible = normalizarHora(t.o_hora);
+  hora.textContent = horaVisible;
 
   const datos = document.createElement("div");
   datos.className = "turno__datos";
@@ -86,7 +102,7 @@ function crearTarjetaTurno(t) {
   nombre.textContent = t.o_nombre;
   const fecha = document.createElement("span");
   fecha.className = "turno__fecha";
-  fecha.textContent = `${fechaCorta(t.o_fecha)} · ${t.o_hora} hs`;
+  fecha.textContent = `${fechaCorta(t.o_fecha)} · ${horaVisible} hs`;
   const contacto = document.createElement("div");
   contacto.className = "turno__contacto";
   const wa = telefonoWhatsApp(t.o_telefono);
@@ -96,7 +112,7 @@ function crearTarjetaTurno(t) {
   tel.textContent = t.o_telefono;
   const linkWa = document.createElement("a");
   linkWa.className = "turno__wa";
-  linkWa.href = `https://wa.me/${wa}?text=${encodeURIComponent(`Hola ${t.o_nombre}, te escribo por tu turno del ${t.o_fecha} a las ${t.o_hora}.`)}`;
+  linkWa.href = `https://wa.me/${wa}?text=${encodeURIComponent(`Hola ${t.o_nombre}, te escribo por tu turno del ${t.o_fecha} a las ${horaVisible}.`)}`;
   linkWa.target = "_blank";
   linkWa.rel = "noopener noreferrer";
   linkWa.textContent = "WHATSAPP ↗";
@@ -114,7 +130,9 @@ function crearTarjetaTurno(t) {
     btn.type = "button";
     btn.textContent = texto;
     btn.dataset.accion = estado;
-    if (t.o_estado === estado) btn.disabled = true;
+    const permitido = (TRANSICIONES[t.o_estado] ?? []).includes(estado);
+    btn.disabled = !permitido;
+    if (!permitido) btn.title = "Cambio no permitido para el estado actual";
     btn.addEventListener("click", () => cambiarEstado(t.o_id, estado));
     acciones.appendChild(btn);
   });
@@ -123,13 +141,24 @@ function crearTarjetaTurno(t) {
 }
 
 async function cambiarEstado(id, estado) {
+  if (cambiosEnCurso.has(id)) return;
+  const cliente = globalThis.supabaseBarberia;
+  if (!cliente) {
+    mostrarCartel("No pude conectar con la nube.", "error");
+    return;
+  }
+  cambiosEnCurso.add(id);
   try {
-    const { error } = await globalThis.supabaseBarberia.rpc("admin_cambiar_estado", { p_id: id, p_nuevo: estado });
+    mostrarCartel("Actualizando turno...");
+    const { error } = await cliente.rpc("admin_cambiar_estado", { p_id: id, p_nuevo: estado });
     if (error) throw error;
     await cargarTodo();
   } catch (e) {
-    const msg = /TRANSICION_INVALIDA/.test(e.message || "") ? "Ese cambio de estado no está permitido." : "No se pudo cambiar el estado.";
+    const detalle = `${e?.message ?? ""} ${e?.details ?? ""}`;
+    const msg = /TRANSICION_INVALIDA/.test(detalle) ? "Ese cambio de estado no está permitido." : "No se pudo cambiar el estado.";
     mostrarCartel(msg, "error");
+  } finally {
+    cambiosEnCurso.delete(id);
   }
 }
 
@@ -183,6 +212,7 @@ function dibujarReincidentes(filas) {
 }
 
 async function cargarTodo() {
+  const numeroCarga = ++ultimaCarga;
   const fecha = campoFecha.value || hoyValor();
   mostrarCartel("Cargando turnos...");
   lista.innerHTML = "";
@@ -191,6 +221,7 @@ async function cargarTodo() {
     const { desde, hasta, lunes } = rangoPedido(fecha);
     const { data, error } = await cliente.rpc("admin_listar_rango", { d1: desde, d2: hasta });
     if (error) throw error;
+    if (numeroCarga !== ultimaCarga) return;
     const filas = data || [];
     const delDia = filas.filter((r) => r.o_fecha === fecha);
 
@@ -231,7 +262,9 @@ async function cargarTodo() {
     dibujarSemana(dias);
     dibujarReincidentes(filas);
   } catch (e) {
-    const msg = /SOLO_BARBERO/.test(e.message || "")
+    if (numeroCarga !== ultimaCarga) return;
+    const detalle = `${e?.message ?? ""} ${e?.details ?? ""}`;
+    const msg = /SOLO_BARBERO/.test(detalle)
       ? "Tu usuario no es barbero. Pedí acceso e intentá de nuevo."
       : "No pude leer. Revisá conexión y sesión.";
     mostrarCartel(msg, "error");

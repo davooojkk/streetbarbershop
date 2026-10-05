@@ -1,0 +1,7 @@
+{
+  "name": "streetbarbershop",
+  "private": true,
+  "scripts": {
+    "test": "node tests/calendario-fechas.test.js && node tests/validacion.test.js && node tests/static-audit.test.js"
+  }
+}

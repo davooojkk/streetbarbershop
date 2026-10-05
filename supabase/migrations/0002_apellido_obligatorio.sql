@@ -58,7 +58,7 @@ begin
       (slot_fecha, slot_hora, nombre, telefono, estado,
        cancel_token_hash, request_id, request_fp)
     values (p_fecha, p_hora, p_nombre, p_telefono, 'pendiente',
-            encode(digest(p_cancel_token::text, 'sha256'), 'hex'),
+            encode(extensions.digest(p_cancel_token::text, 'sha256'), 'hex'),
             p_request_id, v_fp)
     returning id, slot_fecha, slot_hora, estado
       into o_id, o_fecha, o_hora, o_estado;

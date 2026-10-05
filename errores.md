@@ -19,8 +19,9 @@ copiados tal cual aparecen en pantalla.
 | Revisá los campos marcados antes de solicitar el turno. | El navegador marcó nombre o teléfono inválidos. | Corregir los campos en rojo y reintentar. |
 | Ingresá tu nombre y apellido, y un celular uruguayo que comience con 09. | Falta el apellido, o nombre fuera de 2–60 letras, o teléfono que no es `09 + 7 números`. | Escribir nombre y apellido reales más celular `091234567`. |
 | No pudimos cancelar. Revisá tu conexión e intentá de nuevo. | Falló `cancelar_con_token` (red, sesión caída o turno ya cambiado). | Reintentar; si sigue, recargar con `Ctrl + F5`. |
-| Sin conexión a la nube: revisá `js/supabase-client.js`. Mostrando vista local. | Falta URL/KEY o no hay internet. La cartelera muestra solo lo local. | Pegar URL y KEY en `js/supabase-client.js` y recargar. |
+| Sin conexión a la nube / No pudimos confirmar los horarios. | Falta URL/KEY, no hay internet o falló una consulta. Los botones quedan bloqueados para no mostrar como libre algo desconocido. | Revisar configuración y conexión; después recargar. |
 | No pude guardar (`CÓDIGO`). Revisá tu conexión e intentá de nuevo. | La nube rechazó el guardado. El `CÓDIGO` dice cuál (ver sección 4). | Buscar el `CÓDIGO` abajo. Si dice red, revisar conexión. |
+| La base todavía no tiene todas las migraciones. | Falta una RPC o Supabase no encuentra `pgcrypto.digest` (`42883`/`PGRST202`). | Aplicar, en orden, las migraciones pendientes; para el fallo actual ejecutar primero `0003_reparar_pgcrypto.sql`. |
 | Elegí un nuevo horario… / Cancelaste el cambio… | Avisos informativos del modo CAMBIAR TURNO, no son errores. | Seguir eligiendo o cerrar el modo. |
 
 Mensajes de éxito (para reconocerlos): `¡Turno solicitado!`, `¡Turno cambiado!`,
@@ -63,6 +64,8 @@ Mensajes de éxito (para reconocerlos): `¡Turno solicitado!`, `¡Turno cambiado
 | `TOKEN_INVALIDO_O_ESTADO_FINAL` | Agenda | Token mal o turno ya cancelado/atendido. | Recargar; si cancelaste, pedir turno nuevo. |
 | `RESERVA_INEXISTENTE` | Agenda, dashboard | El id ya no existe (borrado manual en panel). | No borrar filas a mano; recargar. |
 | `SLOT_IGUAL` | Agenda (cambio) | Cambio al mismo slot actual. | Elegir otro horario o cerrar el modo cambio. |
+| `TOKEN_INVALIDO` | Agenda/home | El turno local no existe o su token no coincide. | La web elimina la copia obsoleta; elegir un turno nuevo si corresponde. |
+| `CONFIGURACION_BACKEND` | Agenda | Falta una función/migración o el caché de PostgREST aún no la ve. | Aplicar `0003` y `0004`, esperar hasta 2 min y recargar. |
 | `SOLO_BARBERO` | Dashboard | Usuario sin fila en `barberos`. | Insertar su UID en `public.barberos`. |
 | `TRANSICION_INVALIDA` | Dashboard | Cambio de estado no permitido. | Respetar la máquina: `pendiente → confirmado/cancelado`, `confirmado → atendido/cancelado`. |
 | `TOPE_POR_TELEFONO` | Gate/tests | Límite antifraude en pruebas. | Usar otro teléfono de prueba. |
@@ -72,6 +75,7 @@ Mensajes de éxito (para reconocerlos): `¡Turno solicitado!`, `¡Turno cambiado
 | Síntoma | Causa | Solución |
 |---|---|---|
 | `Could not find the function … in the schema cache` | Migración no corrida o recién corrida (caché PostgREST tarda 1–2 min). | Correr `supabase/migrations/0001_modelo_seguro.sql` en SQL Editor; esperar 2 min; `Ctrl + F5`. |
+| `function digest(text, unknown) does not exist` (`42883`) | `crear_reserva`, cancelar o cambiar desde GitHub Pages. `pgcrypto` está en `extensions`, pero las RPC antiguas tenían `search_path` vacío. | Ejecutar `supabase/migrations/0003_reparar_pgcrypto.sql`. Esta fue la causa reproducida del fallo de reservas publicado. |
 | `permission denied / 401 / 42501` | RLS o falta de `GRANT` (anon tocando tabla o RPC de barbero). | No llamar la tabla directo; usar RPC. Si es barbero, revisar `barberos` y sesión. |
 | `Failed to fetch` / red en `Console` | Sin internet, proyecto pausado o URL mal (ej: con `/rest/v1` de más). | URL solo `https://xxx.supabase.co`; revisar pausa en el panel. |
 | Proyecto pausado (panel Supabase) | Plan free sin uso 1 semana. | `Unpause`; a producción paga para evitarlo. |
@@ -89,6 +93,9 @@ where nombre !~ '[^[:space:]]+[[:space:]]+[^[:space:]]+';
 
 Si sale vacía, correr el archivo. Si hay filas: pedir el apellido al
 cliente o cancelarlas desde el dashboard, y recién después migrar.
+
+Después aplicar `0003_reparar_pgcrypto.sql` y
+`0004_integridad_reintentos.sql`, en ese orden.
 
 ## 7. Regla para agregar errores nuevos
 

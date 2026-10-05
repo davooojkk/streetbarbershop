@@ -23,7 +23,20 @@ const patronNombrePersona = /^[\p{L}][\p{L}'-]*(\s+[\p{L}][\p{L}'-]*)+$/u;
 // Saca espacios del inicio/fin y convierte espacios dobles en uno solo.
 // Ejemplo: "  Juan   Pérez  " → "Juan Pérez".
 function normalizarNombre(valor) {
-  return valor.trim().replace(/\s+/g, " ");
+  return String(valor ?? "").trim().replace(/\s+/g, " ");
+}
+
+function esNombreValido(valor) {
+  const nombre = normalizarNombre(valor);
+  return nombre.length >= 2 && nombre.length <= 60 && patronNombrePersona.test(nombre);
+}
+
+function normalizarTelefono(valor) {
+  return String(valor ?? "").replace(/[^0-9]/g, "").slice(0, 9);
+}
+
+function esTelefonoValido(valor) {
+  return patronTelefonoUruguayo.test(String(valor ?? ""));
 }
 
 // -- Revisar un campo de nombre --
@@ -32,9 +45,8 @@ function normalizarNombre(valor) {
 // Devuelve true si está bien, false si está mal.
 function validarNombre(campo) {
   const nombre = normalizarNombre(campo.value);
-  const largoOk = nombre.length >= 2 && nombre.length <= 60;
   const mensaje =
-    campo.value && !(largoOk && patronNombrePersona.test(nombre))
+    campo.value && !esNombreValido(nombre)
       ? "Ingresá tu nombre y apellido (dos palabras, solo letras)."
       : "";
 
@@ -47,7 +59,7 @@ function validarNombre(campo) {
 // Misma idea: si hay texto y no cumple el molde 09 + 7 números, marca error.
 function validarTelefono(campo) {
   const mensaje =
-    campo.value && !patronTelefonoUruguayo.test(campo.value)
+    campo.value && !esTelefonoValido(campo.value)
       ? "Ingresá un celular uruguayo de 9 dígitos que comience con 09."
       : "";
 
@@ -61,7 +73,7 @@ function validarTelefono(campo) {
 // - "input" = cada vez que escribís una letra, revisamos.
 // - "invalid" = cuando el navegador lo marca como inválido, ponemos nuestro mensaje.
 // - "blur" = cuando salís del campo, lo limpiamos y revisamos.
-document.querySelectorAll("[data-nombre-persona]").forEach((campo) => {
+if (typeof document !== "undefined") document.querySelectorAll("[data-nombre-persona]").forEach((campo) => {
   campo.addEventListener("input", () => validarNombre(campo));
   campo.addEventListener("invalid", () => validarNombre(campo));
   campo.addEventListener("blur", () => {
@@ -73,9 +85,9 @@ document.querySelectorAll("[data-nombre-persona]").forEach((campo) => {
 // -- Vigilar todos los campos de celular --
 // Además de revisar, limpiamos automáticamente: borramos todo lo que no sea número
 // y cortamos a 9 dígitos. Así si pegás "09-123-456", queda "09123456..." solo.
-document.querySelectorAll("[data-telefono-uy]").forEach((campo) => {
+if (typeof document !== "undefined") document.querySelectorAll("[data-telefono-uy]").forEach((campo) => {
   campo.addEventListener("input", () => {
-    campo.value = campo.value.replace(/[^0-9]/g, "").slice(0, 9);
+    campo.value = normalizarTelefono(campo.value);
     validarTelefono(campo);
   });
 
@@ -86,6 +98,10 @@ document.querySelectorAll("[data-telefono-uy]").forEach((campo) => {
 // La usan calendario.js y home.js antes de aceptar el envío.
 // Limpia el nombre, revisa ambos campos y devuelve true/false.
 globalThis.ValidacionReserva = Object.freeze({
+  esNombreValido,
+  esTelefonoValido,
+  normalizarNombre,
+  normalizarTelefono,
   validarFormulario(formulario) {
     const campoNombre = formulario.querySelector("[data-nombre-persona]");
     const campoTelefono = formulario.querySelector("[data-telefono-uy]");
@@ -102,3 +118,7 @@ globalThis.ValidacionReserva = Object.freeze({
     return formulario.checkValidity();
   },
 });
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = globalThis.ValidacionReserva;
+}

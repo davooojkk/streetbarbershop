@@ -132,8 +132,11 @@
       return false;
     }
 
+    const partes = String(hora).match(/^([01][0-9]|2[0-3]):([0-5][0-9])$/);
+    if (!partes) return true;
     // Separamos "10:30" en horas=10 y minutos=30.
-    const [horas, minutos] = hora.split(":").map(Number);
+    const horas = Number(partes[1]);
+    const minutos = Number(partes[2]);
     const turno = new Date(
       fecha.getFullYear(),
       fecha.getMonth(),
@@ -181,11 +184,13 @@
   // Si la fecha es inválida, por seguridad decimos que sí pasó (true)
   // para no mostrar un turno roto como disponible.
   function turnoYaPaso(fecha, hora, ahora = new Date()) {
-    const [horas, minutos] = String(hora).split(":").map(Number);
+    const partes = String(hora).match(/^([01][0-9]|2[0-3]):([0-5][0-9])$/);
 
-    if (!fecha || !Number.isInteger(horas) || !Number.isInteger(minutos)) {
+    if (!fecha || Number.isNaN(fecha.getTime()) || !partes) {
       return true;
     }
+    const horas = Number(partes[1]);
+    const minutos = Number(partes[2]);
 
     const turno = new Date(
       fecha.getFullYear(),

@@ -60,25 +60,62 @@ function sb() {
   return c;
 }
 
-// Llama una RPC y devuelve { fila, codigoError }.
-// codigoError es el texto del RAISE (SLOT_OCUPADO, TOPE_POR_TELEFONO, ...).
+const CODIGOS_RPC = [
+  "SLOT_OCUPADO",
+  "TOPE_POR_TELEFONO",
+  "DOMINGO_CERRADO",
+  "FECHA_PASADA",
+  "SLOT_NO_HABILITADO",
+  "FUERA_DE_VENTANA",
+  "PAYLOAD_INVALIDO",
+  "IDEMPOTENCY_KEY_REUSED",
+  "TOKEN_INVALIDO_O_ESTADO_FINAL",
+  "TOKEN_INVALIDO",
+  "RESERVA_INEXISTENTE",
+  "SLOT_IGUAL",
+];
+
+function extraerCodigoError(error) {
+  const detalle = [error?.message, error?.details, error?.hint, error?.code]
+    .filter(Boolean)
+    .join(" ");
+  if (/\b42883\b|PGRST202|schema cache|function .* does not exist/i.test(detalle)) {
+    return "CONFIGURACION_BACKEND";
+  }
+  return CODIGOS_RPC.find((codigo) => detalle.includes(codigo)) ?? "ERROR_RED";
+}
+
+// Llama una RPC y siempre devuelve un resultado controlado, incluso si fetch
+// lanza una excepción. codigoError es estable y no muestra detalles internos.
 async function llamarRpc(nombre, args) {
   const cliente = sb();
   if (!cliente) return { fila: null, codigoError: "SIN_NUBE" };
-  const { data, error } = await cliente.rpc(nombre, args);
-  if (error) return { fila: null, codigoError: error.message || "ERROR_RED" };
-  const fila = Array.isArray(data) ? data[0] ?? null : data;
-  return { fila, codigoError: null };
+  try {
+    const { data, error } = await cliente.rpc(nombre, args);
+    if (error) return { fila: null, codigoError: extraerCodigoError(error) };
+    const fila = Array.isArray(data) ? data[0] ?? null : data;
+    return { fila, codigoError: null };
+  } catch {
+    return { fila: null, codigoError: "ERROR_RED" };
+  }
 }
 
 // -- Estado en memoria + mi turno guardado --
 const CLAVE_MI_TURNO = "streetBarberMiTurno";
+const CLAVE_OPERACION_PENDIENTE = "streetBarberOperacionPendiente";
 const ocupados = new Set(); // slotKeys "AAAA-MM-DD|HH:MM" ocupados según la nube
 let miTurno = null; // { id, token, fecha, hora, fechaVisible, nombre, telefono }
 let turnoSeleccionado = null;
 let horarioSeleccionado = null;
 let enviandoFormulario = false;
 let modoReprogramacion = false;
+let disponibilidadConfirmada = false;
+let operacionPendienteMemoria = null;
+
+function normalizarHora(hora) {
+  const coincidencia = String(hora ?? "").match(/^([01][0-9]|2[0-3]):([0-5][0-9])/);
+  return coincidencia ? `${coincidencia[1]}:${coincidencia[2]}` : "";
+}
 
 function llaveSlot(fechaValor, hora) {
   return `${fechaValor}|${hora}`;
@@ -87,7 +124,8 @@ function llaveSlot(fechaValor, hora) {
 function leerMiTurno() {
   try {
     const t = JSON.parse(localStorage.getItem(CLAVE_MI_TURNO) ?? "null");
-    if (t?.id && t?.token && t?.fecha && t?.hora) return t;
+    const hora = normalizarHora(t?.hora);
+    if (t?.id && t?.token && t?.fecha && hora) return { ...t, hora };
   } catch { /* sin storage seguimos sin turno */ }
   return null;
 }
@@ -101,6 +139,37 @@ function guardarMiTurno(t) {
 }
 
 miTurno = leerMiTurno();
+
+function leerOperacionPendiente() {
+  try {
+    return JSON.parse(sessionStorage.getItem(CLAVE_OPERACION_PENDIENTE) ?? "null")
+      ?? operacionPendienteMemoria;
+  } catch {
+    return operacionPendienteMemoria;
+  }
+}
+
+function guardarOperacionPendiente(operacion) {
+  operacionPendienteMemoria = operacion;
+  try {
+    if (operacion) sessionStorage.setItem(CLAVE_OPERACION_PENDIENTE, JSON.stringify(operacion));
+    else sessionStorage.removeItem(CLAVE_OPERACION_PENDIENTE);
+  } catch { /* la copia en memoria mantiene el reintento dentro de la página */ }
+}
+
+function idsParaOperacion(firma) {
+  const anterior = leerOperacionPendiente();
+  if (anterior?.firma === firma && anterior?.requestId && anterior?.cancelToken) {
+    return anterior;
+  }
+  const operacion = {
+    firma,
+    requestId: crypto.randomUUID(),
+    cancelToken: crypto.randomUUID(),
+  };
+  guardarOperacionPendiente(operacion);
+  return operacion;
+}
 
 // -- Prefill desde la home (nombre/teléfono, NO el turno) --
 const datosIniciales = { nombre: "", telefono: "" };
@@ -132,6 +201,39 @@ function miTurnoVigente(ahora = new Date()) {
 }
 miTurnoVigente();
 
+async function reconciliarMiTurno() {
+  if (!miTurno || !miTurnoVigente() || !sb()) return;
+  const { fila, codigoError } = await llamarRpc("obtener_reserva_con_token", {
+    p_id: miTurno.id,
+    p_token: miTurno.token,
+  });
+
+  if (codigoError === "TOKEN_INVALIDO" || codigoError === "RESERVA_INEXISTENTE") {
+    guardarMiTurno(null);
+    return;
+  }
+  // Ante una caída de red se conserva la copia local para no habilitar un
+  // segundo turno por accidente.
+  if (codigoError || !fila) return;
+
+  const hora = normalizarHora(fila.o_hora);
+  if (!["pendiente", "confirmado"].includes(fila.o_estado) || !hora) {
+    guardarMiTurno(null);
+    return;
+  }
+  const fecha = crearFechaDesdeValor(fila.o_fecha);
+  if (!fecha || turnoYaPaso(fecha, hora)) {
+    guardarMiTurno(null);
+    return;
+  }
+  guardarMiTurno({
+    ...miTurno,
+    fecha: fila.o_fecha,
+    hora,
+    fechaVisible: formatearFechaLarga(fecha),
+  });
+}
+
 function actualizarPanelReserva() {
   if (!reservaActivaPanel) return;
   if (!miTurno || !miTurnoVigente()) {
@@ -153,6 +255,10 @@ function configurarModalReserva() {
   textoSuperiorModal.textContent = cambiando ? "ELEGISTE UN NUEVO HORARIO" : "COMPLETÁ TUS DATOS";
   tituloModal.textContent = cambiando ? "Cambiá tu turno" : "Reservá tu turno";
   etiquetaBotonEnviar.textContent = cambiando ? "CONFIRMAR CAMBIO" : "QUIERO MI TURNO";
+  // cambiar_con_token conserva los datos originales. Evitamos que el formulario
+  // prometa una edición de contacto que la RPC no realiza.
+  campoNombre.readOnly = cambiando;
+  campoTelefono.readOnly = cambiando;
 }
 
 function mostrarEstadoAgenda(mensaje, tipo = "info") {
@@ -182,6 +288,7 @@ function obtenerEstadoTurno(fechaObj, fechaValor, hora, ahora = new Date()) {
   if (miTurno && miTurnoVigente(ahora) && miTurno.fecha === fechaValor && miTurno.hora === hora) {
     return "propio";
   }
+  if (!disponibilidadConfirmada) return "desconocido";
   if (ocupados.has(llaveSlot(fechaValor, hora))) return "ocupado";
   if (horarioYaPaso(fechaObj, hora, ahora)) return "pasado";
   if (turnoSeleccionado && turnoSeleccionado.llave === llaveSlot(fechaValor, hora)) return "seleccionado";
@@ -259,15 +366,20 @@ function generarCalendario(ahora = new Date()) {
       boton.classList.add("horario");
       boton.type = "button";
       boton.dataset.estado = estadoTurno;
-      if (estadoTurno === "ocupado" || estadoTurno === "propio") {
+      if (estadoTurno === "ocupado" || estadoTurno === "propio" || estadoTurno === "desconocido") {
         const h = document.createElement("span");
         const e = document.createElement("small");
         h.textContent = hora;
-        e.textContent = estadoTurno === "propio" ? "TU TURNO" : "OCUPADO";
+        e.textContent = estadoTurno === "propio"
+          ? "TU TURNO"
+          : estadoTurno === "ocupado" ? "OCUPADO" : "CARGANDO";
         boton.append(h, e);
         boton.disabled = true;
         boton.classList.add(estadoTurno);
-        boton.setAttribute("aria-label", `${fechaVisible}, ${hora}, ${estadoTurno === "propio" ? "tu turno" : "ocupado"}`);
+        const etiqueta = estadoTurno === "propio"
+          ? "tu turno"
+          : estadoTurno === "ocupado" ? "ocupado" : "disponibilidad sin confirmar";
+        boton.setAttribute("aria-label", `${fechaVisible}, ${hora}, ${etiqueta}`);
       } else {
         boton.textContent = hora;
         boton.setAttribute("aria-label", `${fechaVisible}, ${hora}, ${estadoTurno}`);
@@ -293,28 +405,44 @@ function generarCalendario(ahora = new Date()) {
 async function cargarDisponibilidad() {
   const cliente = sb();
   if (!cliente) {
+    disponibilidadConfirmada = false;
     mostrarEstadoAgenda("Sin conexión a la nube: revisá js/supabase-client.js. Mostrando vista local.", "error");
-    return;
+    return false;
   }
   try {
     const dias = obtenerProximosDiasAbiertos(new Date(), 5);
-    for (const d of dias) {
-      const valor = formatearFechaValor(d);
-      const { data, error } = await cliente.rpc("obtener_disponibilidad", { dia: valor });
-      if (error || !data) continue;
-      data.forEach((h) => {
-        if (h.ocupado) ocupados.add(llaveSlot(valor, h.hora));
+    const respuestas = await Promise.all(dias.map(async (d) => {
+      const fecha = formatearFechaValor(d);
+      const { data, error } = await cliente.rpc("obtener_disponibilidad", { dia: fecha });
+      if (error || !Array.isArray(data)) throw error ?? new Error("RESPUESTA_INVALIDA");
+      return { fecha, data };
+    }));
+    const nuevosOcupados = new Set();
+    for (const respuesta of respuestas) {
+      respuesta.data.forEach((h) => {
+        const hora = normalizarHora(h.hora);
+        if (h.ocupado && hora) nuevosOcupados.add(llaveSlot(respuesta.fecha, hora));
       });
     }
-  } catch { /* la cartelera local sigue útil */ }
+    ocupados.clear();
+    nuevosOcupados.forEach((llave) => ocupados.add(llave));
+    disponibilidadConfirmada = true;
+    return true;
+  } catch {
+    disponibilidadConfirmada = false;
+    mostrarEstadoAgenda("No pudimos confirmar los horarios. Revisá tu conexión y reintentá.", "error");
+    return false;
+  }
 }
 
 actualizarPanelReserva();
 generarCalendario();
-cargarDisponibilidad().then(() => {
+(async () => {
+  await reconciliarMiTurno();
   actualizarPanelReserva();
+  await cargarDisponibilidad();
   generarCalendario();
-});
+})();
 
 document.querySelectorAll("[data-close-modal]").forEach((b) => b.addEventListener("click", cerrarFormularioTurno));
 modalTurno.addEventListener("click", (e) => {
@@ -375,9 +503,23 @@ botonConfirmarCancelacion?.addEventListener("click", async () => {
     return;
   }
   const cancelada = { ...miTurno };
-  const { codigoError } = await llamarRpc("cancelar_con_token", { p_id: cancelada.id, p_token: cancelada.token });
+  botonConfirmarCancelacion.disabled = true;
+  botonConfirmarCancelacion.setAttribute("aria-busy", "true");
+  const { codigoError } = await llamarRpc("cancelar_con_token", {
+    p_id: cancelada.id,
+    p_token: cancelada.token,
+  });
+  botonConfirmarCancelacion.disabled = false;
+  botonConfirmarCancelacion.removeAttribute("aria-busy");
   if (codigoError) {
-    mostrarEstadoAgenda("No pudimos cancelar. Revisá tu conexión e intentá de nuevo.", "error");
+    if (["TOKEN_INVALIDO_O_ESTADO_FINAL", "TOKEN_INVALIDO", "RESERVA_INEXISTENTE"].includes(codigoError)) {
+      guardarMiTurno(null);
+      modoReprogramacion = false;
+      actualizarPanelReserva();
+      mostrarEstadoAgenda("Ese turno ya no está activo. Actualizamos tu agenda.", "info");
+    } else {
+      mostrarEstadoAgenda("No pudimos cancelar. Revisá tu conexión e intentá de nuevo.", "error");
+    }
     cerrarModalCancelacion();
     return;
   }
@@ -386,6 +528,9 @@ botonConfirmarCancelacion?.addEventListener("click", async () => {
   modoReprogramacion = false;
   cerrarModalCancelacion();
   actualizarPanelReserva();
+  disponibilidadConfirmada = false;
+  generarCalendario();
+  await cargarDisponibilidad();
   generarCalendario();
   mostrarEstadoAgenda(`Cancelaste el turno del ${cancelada.fechaVisible} a las ${cancelada.hora} hs.`, "exito");
   estadoAgenda.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -403,9 +548,14 @@ const MENSAJES_RPC = {
   SLOT_NO_HABILITADO: "Ese horario no está habilitado. Elegí otro turno.",
   FUERA_DE_VENTANA: "Solo mostramos los próximos días abiertos.",
   PAYLOAD_INVALIDO: "Ingresá tu nombre y apellido, y un celular uruguayo que comience con 09.",
-  IDEMPOTENCY_KEY_REUSED: "Ese pedido ya se procesó. Revisá tu turno arriba.",
+  IDEMPOTENCY_KEY_REUSED: "Ese pedido no coincide con el reintento anterior. Volvé a elegir el horario.",
   TOKEN_INVALIDO_O_ESTADO_FINAL: "Tu turno cambió de estado. Recargá la página.",
+  TOKEN_INVALIDO: "No pudimos verificar ese turno en este dispositivo.",
+  RESERVA_INEXISTENTE: "Ese turno ya no existe. Actualizamos tu agenda.",
+  SLOT_IGUAL: "Elegiste el mismo horario que ya tenés.",
   SIN_NUBE: "Sin conexión a la nube: revisá js/supabase-client.js.",
+  ERROR_RED: "No pudimos conectar con la nube. Podés reintentar sin duplicar el turno.",
+  CONFIGURACION_BACKEND: "La base todavía no tiene todas las migraciones. Avisale al administrador.",
 };
 
 // Crear o cambiar: UNA sola RPC atómica. Reintentar SOLO con mismos ids
@@ -415,7 +565,7 @@ formularioTurno.addEventListener("submit", async (evento) => {
   if (enviandoFormulario) return;
   ocultarErrorFormulario();
 
-  if (!turnoSeleccionado || !campoFecha.value || !campoHora.value ||
+  if (!disponibilidadConfirmada || !turnoSeleccionado || !campoFecha.value || !campoHora.value ||
       campoFecha.value !== turnoSeleccionado.fecha || campoHora.value !== turnoSeleccionado.hora ||
       ocupados.has(turnoSeleccionado.llave)) {
     mostrarEstadoAgenda("Ese horario ya no está disponible. Elegí otro turno.", "error");
@@ -440,10 +590,16 @@ formularioTurno.addEventListener("submit", async (evento) => {
 
   const esCambio = Boolean(miTurno && modoReprogramacion);
   const anterior = miTurno ? { ...miTurno } : null;
-  // Secretos generados ANTES de llamar: si la respuesta se pierde,
-  // reintentamos con los mismos (idempotente) y nada se duplica.
-  const reqId = crypto.randomUUID();
-  const tok = crypto.randomUUID();
+  // Si la respuesta se pierde, el siguiente submit recupera estos MISMOS ids
+  // desde sessionStorage y la base devuelve el resultado original.
+  const nombre = campoNombre.value.trim();
+  const telefono = campoTelefono.value;
+  const firma = esCambio
+    ? JSON.stringify(["cambiar", anterior.id, turnoSeleccionado.fecha, turnoSeleccionado.hora])
+    : JSON.stringify(["crear", turnoSeleccionado.fecha, turnoSeleccionado.hora, nombre, telefono]);
+  const operacion = idsParaOperacion(firma);
+  const reqId = operacion.requestId;
+  const tok = operacion.cancelToken;
 
   let fila = null;
   let codigoError = null;
@@ -460,8 +616,8 @@ formularioTurno.addEventListener("submit", async (evento) => {
     ({ fila, codigoError } = await llamarRpc("crear_reserva", {
       p_fecha: turnoSeleccionado.fecha,
       p_hora: turnoSeleccionado.hora,
-      p_nombre: campoNombre.value.trim(),
-      p_telefono: campoTelefono.value,
+      p_nombre: nombre,
+      p_telefono: telefono,
       p_request_id: reqId,
       p_cancel_token: tok,
     }));
@@ -469,25 +625,32 @@ formularioTurno.addEventListener("submit", async (evento) => {
 
   if (codigoError || !fila) {
     restablecerBotonEnviar();
-    // Si el código no está en el mapa, mostrarlo igual: así se puede diagnosticar.
     mostrarEstadoAgenda(
-      MENSAJES_RPC[codigoError] ?? `No pude guardar (${codigoError}). Revisá tu conexión e intentá de nuevo.`,
+      MENSAJES_RPC[codigoError] ?? "No pude guardar. Revisá tu conexión e intentá de nuevo.",
       "error",
     );
-    ocupados.clear();
+    disponibilidadConfirmada = false;
     await cargarDisponibilidad();
     generarCalendario();
     return;
   }
 
+  const horaGuardada = normalizarHora(fila.o_hora);
+  const fechaGuardada = crearFechaDesdeValor(fila.o_fecha);
+  if (!horaGuardada || !fechaGuardada) {
+    restablecerBotonEnviar();
+    mostrarEstadoAgenda("La nube devolvió un turno con formato inválido. Reintentá sin cambiar los datos.", "error");
+    return;
+  }
+  guardarOperacionPendiente(null);
   guardarMiTurno({
     id: fila.o_id,
     token: tok,
     fecha: fila.o_fecha,
-    hora: fila.o_hora,
-    fechaVisible: turnoSeleccionado.fechaVisible,
-    nombre: campoNombre.value.trim(),
-    telefono: campoTelefono.value,
+    hora: horaGuardada,
+    fechaVisible: formatearFechaLarga(fechaGuardada),
+    nombre: esCambio ? anterior.nombre : nombre,
+    telefono: esCambio ? anterior.telefono : telefono,
   });
   modoReprogramacion = false;
   document.dispatchEvent(new CustomEvent(esCambio ? "turno:cambiado" : "turno:solicitado", { detail: { id: fila.o_id } }));
@@ -503,7 +666,7 @@ formularioTurno.addEventListener("submit", async (evento) => {
   horarioSeleccionado = null;
   turnoSeleccionado = null;
   actualizarPanelReserva();
-  ocupados.clear();
+  disponibilidadConfirmada = false;
   await cargarDisponibilidad();
   generarCalendario();
 
